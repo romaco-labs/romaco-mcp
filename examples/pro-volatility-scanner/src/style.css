@@ -1,0 +1,133 @@
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+/* ── "Operating room" treatment ────────────────────────────────────────────
+   While Pattern Engine v2 injects drawings (McpBridge onProcessingChange), the
+   chart goes under the knife: a soft blur on the candles, a pulsing glow frame,
+   and a sweeping scanline. Everything fades in/out so the finished scan is
+   REVEALED, not popped. */
+
+.chart-stage {
+  position: relative;
+  overflow: hidden;
+}
+
+.chart-blur-layer {
+  position: absolute;
+  inset: 0;
+  transition: filter 0.45s ease;
+  will-change: filter;
+}
+
+.chart-stage.processing .chart-blur-layer {
+  filter: blur(2.5px) brightness(0.82) saturate(0.8);
+}
+
+/* Glow frame lives above the chart but ignores the pointer. Always mounted,
+   opacity-driven, so removal is a clean fade instead of a hard cut. */
+.chart-glow {
+  position: absolute;
+  inset: 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 92, 56, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 6;
+}
+
+.chart-stage.processing .chart-glow {
+  opacity: 1;
+  animation: romaco-surgery-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes romaco-surgery-pulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px 1px rgba(255, 92, 56, 0.35),
+      inset 0 0 18px rgba(255, 92, 56, 0.10);
+  }
+  50% {
+    box-shadow:
+      0 0 32px 6px rgba(255, 92, 56, 0.75),
+      inset 0 0 36px rgba(255, 92, 56, 0.22);
+  }
+}
+
+/* Sweeping scanline — reads as "the engine is measuring the tape". */
+.chart-scanline {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 0;
+  height: 90px;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 5;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 92, 56, 0) 0%,
+    rgba(255, 92, 56, 0.12) 60%,
+    rgba(255, 180, 120, 0.28) 100%
+  );
+  transition: opacity 0.4s ease;
+}
+
+.chart-stage.processing .chart-scanline {
+  opacity: 1;
+  animation: romaco-scan-sweep 2.1s linear infinite;
+}
+
+@keyframes romaco-scan-sweep {
+  0%   { transform: translateY(-90px); }
+  100% { transform: translateY(100vh); }
+}
+
+/* Status chip: tells the user WHAT the shimmer means. */
+.chart-working-chip {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translate(-50%, -6px);
+  padding: 6px 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 92, 56, 0.5);
+  background: rgba(34, 12, 8, 0.85);
+  color: #ffb488;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  z-index: 7;
+}
+
+.chart-stage.processing .chart-working-chip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.chart-working-chip .dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff5c38;
+  margin-right: 8px;
+  vertical-align: 1px;
+  animation: romaco-dot-blink 1s ease-in-out infinite;
+}
+
+@keyframes romaco-dot-blink {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 1; }
+}

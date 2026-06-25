@@ -1,0 +1,35 @@
+[
+  {
+    "kind": "inverse_head_shoulders",
+    "confidence": 0.6736449996214855,
+    "points": [
+      {
+        "ts": 1774877400,
+        "price": 352.1400146484375,
+        "role": "left_shoulder"
+      },
+      {
+        "ts": 1775568600,
+        "price": 337.239990234375,
+        "role": "head"
+      },
+      {
+        "ts": 1777296600,
+        "price": 364.0199890136719,
+        "role": "right_shoulder"
+      },
+      {
+        "ts": 1775050200,
+        "price": 383.1400146484375,
+        "role": "neckline_left"
+      },
+      {
+        "ts": 1776432600,
+        "price": 409.2799987792969,
+        "role": "neckline_right"
+      }
+    ],
+    "target_price": 455.1800231933594,
+    "invalidation_price": 337.239990234375
+  }
+]

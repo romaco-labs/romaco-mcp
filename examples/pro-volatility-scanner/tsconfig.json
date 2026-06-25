@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "node"],
+    "skipLibCheck": true,
+
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "paths": {
+      "romaco-charts": ["../../dist/index.d.ts"],
+      "romaco-charts/react": ["../../dist/react.d.ts"],
+      "romaco-charts/ui": ["../../dist/ui.d.ts"],
+      "romaco-charts/indicators": ["../../dist/indicators.d.ts"],
+      "romaco-charts/drawings": ["../../dist/drawings.d.ts"],
+      "romaco-charts/datafeed": ["../../dist/datafeed.d.ts"]
+    },
+
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
+  },
+  "include": ["src", "vite.config.ts"]
+}

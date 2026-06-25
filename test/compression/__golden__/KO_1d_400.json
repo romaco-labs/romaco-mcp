@@ -1,0 +1,124 @@
+[
+  {
+    "kind": "double_bottom",
+    "confidence": 0.6921877853068383,
+    "points": [
+      {
+        "ts": 1777901400,
+        "price": 77.7300033569336,
+        "role": "bottom_1"
+      },
+      {
+        "ts": 1779197400,
+        "price": 82.66000366210938,
+        "role": "peak"
+      },
+      {
+        "ts": 1780579800,
+        "price": 76.80999755859375,
+        "role": "bottom_2"
+      }
+    ],
+    "target_price": 88.05000686645508,
+    "invalidation_price": 76.80999755859375
+  },
+  {
+    "kind": "channel_up",
+    "confidence": 0.5893824838466134,
+    "points": [
+      {
+        "ts": 1774445400,
+        "price": 71.39700888241039,
+        "role": "base_start"
+      },
+      {
+        "ts": 1780579800,
+        "price": 76.80999755859375,
+        "role": "base_end"
+      },
+      {
+        "ts": 1774445400,
+        "price": 78.46217570915086,
+        "role": "offset"
+      },
+      {
+        "ts": 1775741400,
+        "price": 78.29000091552734,
+        "role": "upper_touch"
+      },
+      {
+        "ts": 1777383000,
+        "price": 80.31999969482422,
+        "role": "upper_touch"
+      },
+      {
+        "ts": 1779197400,
+        "price": 82.66000366210938,
+        "role": "upper_touch"
+      },
+      {
+        "ts": 1776864600,
+        "price": 74.55000305175781,
+        "role": "lower_touch"
+      },
+      {
+        "ts": 1780579800,
+        "price": 76.80999755859375,
+        "role": "lower_touch"
+      }
+    ],
+    "target_price": 83.87516438533422,
+    "invalidation_price": 76.80999755859375
+  },
+  {
+    "kind": "gap_up",
+    "confidence": 0.5676136871686314,
+    "points": [
+      {
+        "ts": 1737729000,
+        "price": 62.0099983215332,
+        "role": "gap_low"
+      },
+      {
+        "ts": 1737988200,
+        "price": 62.470001220703125,
+        "role": "gap_high"
+      }
+    ],
+    "invalidation_price": 62.0099983215332
+  },
+  {
+    "kind": "gap_up",
+    "confidence": 0.724094919063012,
+    "points": [
+      {
+        "ts": 1739197800,
+        "price": 64.6500015258789,
+        "role": "gap_low"
+      },
+      {
+        "ts": 1739284200,
+        "price": 66.41000366210938,
+        "role": "gap_high"
+      }
+    ],
+    "invalidation_price": 64.6500015258789
+  },
+  {
+    "kind": "gap_up",
+    "confidence": 0.638602059764865,
+    "points": [
+      {
+        "ts": 1777296600,
+        "price": 76.70999908447266,
+        "role": "gap_low"
+      },
+      {
+        "ts": 1777383000,
+        "price": 78.08000183105469,
+        "role": "gap_high"
+      }
+    ],
+    "invalidation_price": 76.70999908447266
+  }
+]

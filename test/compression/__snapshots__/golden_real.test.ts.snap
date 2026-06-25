@@ -1,0 +1,10 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`output-order contract > hits emit in detector concatenation order (H&S family before gaps) 1`] = `
+[
+  "head_shoulders",
+  "gap_down",
+  "gap_down",
+  "gap_down",
+]
+`;

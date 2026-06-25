@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Build output (CI rebuilds via `npm run build` before publish)
+dist/
+
+# npm pack output
+*.tgz
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Example apps build artifacts
+examples/*/node_modules/
+examples/*/dist/

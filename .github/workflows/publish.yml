@@ -1,0 +1,44 @@
+name: Publish @romaco/mcp
+
+# Publica @romaco/mcp a npm. Repo independiente — sin relación con el release de
+# romaco-charts. Un tag `v*` aquí publica SOLO el MCP. Cero `needs:`, cero colisión
+# con el monorepo del chart.
+
+on:
+  push:
+    tags:
+      - 'v*'           # dispara en v0.0.1, v0.1.0, v1.0.0, etc.
+  workflow_dispatch:   # correr manual desde GitHub Actions
+
+jobs:
+  publish:
+    name: npm publish (@romaco/mcp)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # npm provenance (attestation de supply-chain)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test (release gate)
+        run: npm test
+
+      - name: Publish → npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        # Publishes to the "latest" dist-tag so `npx @romaco/mcp` resolves it.
+        # For a prerelease, add `--tag next` (or beta) instead.
+        # Si el primer publish falla por provenance, quita `--provenance` y el permiso
+        # `id-token: write`, y re-taggea.

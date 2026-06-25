@@ -1,0 +1,59 @@
+[
+  {
+    "kind": "double_bottom",
+    "confidence": 0.6631602594243319,
+    "points": [
+      {
+        "ts": 1779197400,
+        "price": 731.530029296875,
+        "role": "bottom_1"
+      },
+      {
+        "ts": 1780407000,
+        "price": 760.4000244140625,
+        "role": "peak"
+      },
+      {
+        "ts": 1781011800,
+        "price": 722.5900268554688,
+        "role": "bottom_2"
+      }
+    ],
+    "target_price": 793.7400207519531,
+    "invalidation_price": 722.5900268554688
+  },
+  {
+    "kind": "gap_up",
+    "confidence": 0.5990237272485883,
+    "points": [
+      {
+        "ts": 1746797400,
+        "price": 567.5,
+        "role": "gap_low"
+      },
+      {
+        "ts": 1747056600,
+        "price": 577.0399780273438,
+        "role": "gap_high"
+      }
+    ],
+    "invalidation_price": 567.5
+  },
+  {
+    "kind": "gap_up",
+    "confidence": 0.6467000251907842,
+    "points": [
+      {
+        "ts": 1775568600,
+        "price": 659.6099853515625,
+        "role": "gap_low"
+      },
+      {
+        "ts": 1775655000,
+        "price": 671.4600219726562,
+        "role": "gap_high"
+      }
+    ],
+    "invalidation_price": 659.6099853515625
+  }
+]

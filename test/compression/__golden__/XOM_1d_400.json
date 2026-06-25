@@ -1,0 +1,114 @@
+[
+  {
+    "kind": "head_shoulders",
+    "confidence": 0.754401468958388,
+    "points": [
+      {
+        "ts": 1772461800,
+        "price": 159.61000061035156,
+        "role": "left_shoulder"
+      },
+      {
+        "ts": 1774877400,
+        "price": 176.41000366210938,
+        "role": "head"
+      },
+      {
+        "ts": 1777555800,
+        "price": 155.69000244140625,
+        "role": "right_shoulder"
+      },
+      {
+        "ts": 1772634600,
+        "price": 147.86000061035156,
+        "role": "neckline_left"
+      },
+      {
+        "ts": 1775655000,
+        "price": 150.97999572753906,
+        "role": "neckline_right"
+      }
+    ],
+    "target_price": 122.42999267578125,
+    "invalidation_price": 176.41000366210938
+  },
+  {
+    "kind": "head_shoulders",
+    "confidence": 0.9499005223800143,
+    "points": [
+      {
+        "ts": 1777555800,
+        "price": 155.69000244140625,
+        "role": "left_shoulder"
+      },
+      {
+        "ts": 1779283800,
+        "price": 163.67999267578125,
+        "role": "head"
+      },
+      {
+        "ts": 1780493400,
+        "price": 154.91000366210938,
+        "role": "right_shoulder"
+      },
+      {
+        "ts": 1778247000,
+        "price": 143.9199981689453,
+        "role": "neckline_left"
+      },
+      {
+        "ts": 1780061400,
+        "price": 144.7100067138672,
+        "role": "neckline_right"
+      }
+    ],
+    "target_price": 124.95001220703125,
+    "invalidation_price": 163.67999267578125
+  },
+  {
+    "kind": "double_bottom",
+    "confidence": 0.6693443604732755,
+    "points": [
+      {
+        "ts": 1776432600,
+        "price": 141.97000122070312,
+        "role": "bottom_1"
+      },
+      {
+        "ts": 1777555800,
+        "price": 155.69000244140625,
+        "role": "peak"
+      },
+      {
+        "ts": 1778247000,
+        "price": 143.9199981689453,
+        "role": "bottom_2"
+      }
+    ],
+    "target_price": 168.43500518798828,
+    "invalidation_price": 141.97000122070312
+  },
+  {
+    "kind": "double_bottom",
+    "confidence": 0.7772099593882777,
+    "points": [
+      {
+        "ts": 1778247000,
+        "price": 143.9199981689453,
+        "role": "bottom_1"
+      },
+      {
+        "ts": 1779283800,
+        "price": 163.67999267578125,
+        "role": "peak"
+      },
+      {
+        "ts": 1780061400,
+        "price": 144.7100067138672,
+        "role": "bottom_2"
+      }
+    ],
+    "target_price": 183.04498291015625,
+    "invalidation_price": 143.9199981689453
+  }
+]

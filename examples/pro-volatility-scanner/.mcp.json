@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "romaco": {
+      "command": "npx",
+      "args": ["-y", "@romaco/mcp"],
+      "env": {
+        "ROMACO_APP_URL": "http://localhost:5174"
+      }
+    }
+  }
+}

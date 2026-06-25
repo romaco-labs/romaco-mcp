@@ -1,0 +1,52 @@
+[
+  {
+    "kind": "head_shoulders",
+    "confidence": 0.9673932581796572,
+    "points": [
+      {
+        "ts": 1767709800,
+        "price": 665.52001953125,
+        "role": "left_shoulder"
+      },
+      {
+        "ts": 1769697000,
+        "price": 744,
+        "role": "head"
+      },
+      {
+        "ts": 1771597800,
+        "price": 663.3499755859375,
+        "role": "right_shoulder"
+      },
+      {
+        "ts": 1768919400,
+        "price": 600,
+        "role": "neckline_left"
+      },
+      {
+        "ts": 1770388200,
+        "price": 646.5,
+        "role": "neckline_right"
+      }
+    ],
+    "target_price": 502.5,
+    "invalidation_price": 744
+  },
+  {
+    "kind": "gap_down",
+    "confidence": 0.75,
+    "points": [
+      {
+        "ts": 1777469400,
+        "price": 620.8499755859375,
+        "role": "gap_low"
+      },
+      {
+        "ts": 1777555800,
+        "price": 663.8099975585938,
+        "role": "gap_high"
+      }
+    ],
+    "invalidation_price": 663.8099975585938
+  }
+]
