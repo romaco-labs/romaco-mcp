@@ -69,7 +69,7 @@ export async function callGateway<T = unknown>(path: string, body: unknown): Pro
   }
 
   if (res.status === 401 || res.status === 403) {
-    throw new GatewayError('ROMACO_TOKEN is invalid or revoked. Renew it at romaco.tech', res.status);
+    throw new GatewayError('ROMACO_TOKEN is invalid or revoked. Renew it at romaco.io', res.status);
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');

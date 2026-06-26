@@ -29,7 +29,7 @@ import { registerGoToTimestamp } from './tools/go_to_timestamp.js';
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'romaco',
-    version: '0.0.1',
+    version: '0.0.2',
   });
 
   // Browser-bridge tools (require <McpBridge /> in user's app)
