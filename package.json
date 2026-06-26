@@ -1,6 +1,6 @@
 {
   "name": "@romaco/mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "MCP server for romaco-charts — control your trading chart from Claude, Cursor, or any MCP-compatible AI agent",
   "type": "module",
   "bin": {
@@ -61,10 +61,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/TheAdkk/romaco-mcp"
+    "url": "https://github.com/romaco-labs/romaco-mcp"
   },
-  "homepage": "https://github.com/TheAdkk/romaco-mcp#readme",
+  "homepage": "https://github.com/romaco-labs/romaco-mcp#readme",
   "bugs": {
-    "url": "https://github.com/TheAdkk/romaco-mcp/issues"
+    "url": "https://github.com/romaco-labs/romaco-mcp/issues"
   }
 }
