@@ -3,6 +3,10 @@ import { analyzeSession } from '../compression/analyze.js';
 import { session } from '../session.js';
 import { callGateway, isAuthError, isPro } from '../gateway/client.js';
 
+// Appended in-code so the disclaimer is guaranteed on every thesis output,
+// independent of whether the model honors the description's instruction.
+const DISCLAIMER = '\n\n⚠️ Not investment advice — educational purposes only.';
+
 export function registerThesis(server: McpServer): void {
   server.registerTool(
     'romaco_thesis',
@@ -31,7 +35,7 @@ export function registerThesis(server: McpServer): void {
               timeframe: load?.timeframe,
               candles,
             });
-            return { content: [{ type: 'text' as const, text: JSON.stringify(deep) }] };
+            return { content: [{ type: 'text' as const, text: JSON.stringify(deep) + DISCLAIMER }] };
           } catch (err) {
             // Invalid/revoked token → surface to the user (don't silently fall back to local).
             if (isAuthError(err)) {
@@ -49,7 +53,7 @@ export function registerThesis(server: McpServer): void {
 
         // ─── Free / fallback: local synthesis over the public MarketSummary ──
         const { thesis } = analyzeSession(candles);
-        return { content: [{ type: 'text' as const, text: JSON.stringify(thesis) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify(thesis) + DISCLAIMER }] };
       } catch (err) {
         return {
           content: [{ type: 'text' as const, text: err instanceof Error ? err.message : String(err) }],
