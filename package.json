@@ -1,6 +1,6 @@
 {
   "name": "@romaco/mcp",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "MCP server for romaco-charts — control your trading chart from Claude, Cursor, or any MCP-compatible AI agent",
   "type": "module",
   "bin": {
