@@ -34,6 +34,15 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+const DISCLAIMER = '⚠️ Not investment advice — educational purposes only.';
+
+// thesis.ts appends DISCLAIMER in-code to every success output. Assert it's
+// present, then parse the JSON that precedes it.
+function parseThesis(text: string): any {
+  expect(text).toContain(DISCLAIMER);
+  return JSON.parse(text.replace(DISCLAIMER, '').trim());
+}
+
 function fakeResponse(opts: { status?: number; ok?: boolean; json?: unknown; text?: string }) {
   const status = opts.status ?? 200;
   return {
@@ -51,7 +60,7 @@ describe('romaco_thesis tool', () => {
       const res = await callTool('romaco_thesis', {});
       expect(res.isError).toBe(false);
       expect(Buffer.byteLength(res.text, 'utf8')).toBeLessThan(2048);
-      const t = JSON.parse(res.text);
+      const t = parseThesis(res.text);
       expect(t).toHaveProperty('verdict');
       expect(t).toHaveProperty('bias');
       expect(t).toHaveProperty('bull');
@@ -84,7 +93,7 @@ describe('romaco_thesis tool', () => {
     try {
       const res = await callTool('romaco_thesis', {});
       expect(res.isError).toBe(false);
-      expect(JSON.parse(res.text)).toEqual(deep);
+      expect(parseThesis(res.text)).toEqual(deep);
       const [url] = fetchMock.mock.calls[0] as [string];
       expect(url).toBe('http://localhost:8000/gateway/thesis');
     } finally {
@@ -102,7 +111,7 @@ describe('romaco_thesis tool', () => {
     try {
       const res = await callTool('romaco_thesis', {});
       expect(res.isError).toBe(false);
-      const t = JSON.parse(res.text);
+      const t = parseThesis(res.text);
       expect(t).toHaveProperty('verdict'); // local shape, not backend payload
       expect(t).toHaveProperty('horizon');
     } finally {
