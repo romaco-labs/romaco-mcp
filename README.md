@@ -6,6 +6,8 @@ MCP server for [romaco-charts](https://www.npmjs.com/package/romaco-charts). Con
 npx @romaco/mcp
 ```
 
+![romaco-mcp — an AI agent draws technical analysis on a live chart, grounded in deterministic math (not a hallucinated number in sight)](docs/demo.gif)
+
 ---
 
 ## Philosophy
