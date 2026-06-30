@@ -14,7 +14,7 @@ npx @romaco/mcp
 
 Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Every tool's typical output is under **2 KB**. Raw payloads (full chart state, snapshots, all-bar indicator series) exist but are **gated** behind `acknowledgeHighTokenCost: true` — the agent must consciously opt in and the user must explicitly request raw data.
 
-The rule: *the agent never computes, it always queries*. An agent reasoning over features cannot hallucinate prices; an agent given a 70 KB raw OHLCV dump will burn its context window before it can finish a thought.
+The rule: *the agent never computes, it always queries*. An agent reasoning over computed features can't invent the numbers underneath its analysis — it reads the RSI, the levels, the last price from code, not from its imagination. It still *interprets* them, so the thesis can still be wrong: grounding the data is not the same as grounding the conclusion. But an agent given a 70 KB raw OHLCV dump will burn its context window before it can finish a thought — and invent half the numbers on the way.
 
 ### Cost table
 
