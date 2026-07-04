@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerGetChartContext } from './tools/get_chart_context.js';
 import { registerGetVisibleCandles } from './tools/get_visible_candles.js';
@@ -26,10 +27,16 @@ import { registerListPanes } from './tools/list_panes.js';
 import { registerGetIndicatorValues } from './tools/get_indicator_values.js';
 import { registerGoToTimestamp } from './tools/go_to_timestamp.js';
 
+// Versión SIEMPRE desde package.json — la 0.0.2 hardcodeada quedó
+// desincronizada del paquete publicado (0.0.3) y serverInfo mentía.
+const { version: PKG_VERSION } = createRequire(import.meta.url)('../package.json') as {
+  version: string;
+};
+
 export function createServer(): McpServer {
   const server = new McpServer({
     name: 'romaco',
-    version: '0.0.2',
+    version: PKG_VERSION,
   });
 
   // Browser-bridge tools (require <McpBridge /> in user's app)

@@ -1,4 +1,5 @@
 import { WebSocketServer, type WebSocket } from 'ws';
+import type { IncomingMessage } from 'node:http';
 
 function resolvePort(): number {
   // --port <n> CLI arg takes priority
@@ -21,6 +22,35 @@ import type {
 } from './types.js';
 
 const REQUEST_TIMEOUT_MS = 8_000;
+
+// ── Gate de Origin del bridge ────────────────────────────────────────────
+// Los browsers SIEMPRE mandan Origin en el handshake WS: una página web
+// maliciosa abierta en el mismo browser podría conectarse a
+// ws://localhost:<port> (WebSocket no respeta same-origin) y controlar el
+// chart. Este gate la corta. Conexiones SIN Origin (tests, CLIs, clientes
+// node) se permiten: un proceso local nativo puede falsificar lo que sea,
+// no es la amenaza que un allowlist puede parar.
+// Origins extra (apps de terceros que embeben <McpBridge />):
+//   ROMACO_MCP_ALLOWED_ORIGINS="https://miapp.com,https://otra.com"
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+export function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true; // no-browser (sin header Origin)
+  let url: URL;
+  try {
+    url = new URL(origin);
+  } catch {
+    return false;
+  }
+  const host = url.hostname.toLowerCase();
+  if (LOCAL_HOSTNAMES.has(host)) return true;
+  if (host === 'romaco.io' || host.endsWith('.romaco.io')) return true;
+  const extra = (process.env.ROMACO_MCP_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  return extra.includes(origin.replace(/\/$/, ''));
+}
 // When the port is held by a stale server, keep trying to claim it in the
 // background so the bridge self-heals once the squatter dies — instead of
 // crashing the whole MCP process on startup.
@@ -69,7 +99,11 @@ export class RomacoBridge {
   }
 
   private bind(onSettled?: () => void): void {
-    const wss = new WebSocketServer({ port: this.port });
+    // host explícito: sin él, ws escucha en TODAS las interfaces (::) y el
+    // bridge queda accesible desde la red local — el log decía "localhost"
+    // pero era mentira. Loopback only; los browsers resuelven localhost a
+    // 127.0.0.1 con fallback IPv4 estándar.
+    const wss = new WebSocketServer({ port: this.port, host: '127.0.0.1' });
     this.wss = wss;
 
     wss.on('error', (err) => {
@@ -96,10 +130,19 @@ export class RomacoBridge {
       onSettled?.();
     });
 
-    wss.on('connection', (ws) => this.handleConnection(ws));
+    wss.on('connection', (ws, req) => this.handleConnection(ws, req));
   }
 
-  private handleConnection(ws: WebSocket): void {
+  private handleConnection(ws: WebSocket, req?: IncomingMessage): void {
+    const origin = req?.headers.origin;
+    if (!isAllowedOrigin(origin)) {
+      console.error(
+        `[romaco-mcp] Bridge: conexión rechazada desde origin "${origin}". ` +
+          `Si es tu app, agrégala a ROMACO_MCP_ALLOWED_ORIGINS.`
+      );
+      ws.close(4403, 'origin not allowed');
+      return;
+    }
     // Do NOT claim the client slot on raw connection. On React StrictMode
     // double-mount the aborted first socket can finish its server-side
     // handshake AFTER the surviving one — claiming by connection order would
