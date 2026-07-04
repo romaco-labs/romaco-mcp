@@ -20,7 +20,7 @@ async function setup() {
   const bridge = new RomacoBridge(port);
   await bridge.start();
 
-  const ws = new WebSocket(`ws://localhost:${port}`);
+  const ws = new WebSocket(`ws://127.0.0.1:${port}`);
   await new Promise<void>(r => ws.once('open', r));
   // Real McpBridge sends 'ready' on open; the bridge only adopts the client
   // then (StrictMode zombie guard). The 30ms settle below covers adoption.

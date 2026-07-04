@@ -12,7 +12,7 @@ async function startBridge(port: number) {
 }
 
 async function connectClient(port: number): Promise<WebSocket> {
-  const ws = new WebSocket(`ws://localhost:${port}`);
+  const ws = new WebSocket(`ws://127.0.0.1:${port}`);
   await new Promise<void>((resolve, reject) => {
     ws.once('open', resolve);
     ws.once('error', reject);

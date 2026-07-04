@@ -210,6 +210,13 @@ and capture a snapshot so I can see it.
 | WebSocket port | `7399` | `--port 3200` or `ROMACO_MCP_PORT=3200` |
 | `ROMACO_TOKEN` | _(none → free)_ | API key from [romaco.io](https://romaco.io) — unlocks Pro |
 | `ROMACO_API_URL` | `http://localhost:8000` | ROA-I backend; prod: `https://api.romaco.tech` |
+| `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + romaco.io)_ | Comma-separated origins for `<McpBridge />` pages on other domains |
+
+**Bridge security**: the WebSocket bridge binds to `127.0.0.1` only (never network-visible) and rejects browser connections from unknown origins — a malicious webpage in your browser can't reach the chart. If your app embeds `<McpBridge />` on its own domain, allow it explicitly:
+
+```bash
+ROMACO_MCP_ALLOWED_ORIGINS="https://myapp.com" npx @romaco/mcp
+```
 
 ```bash
 # Custom port
