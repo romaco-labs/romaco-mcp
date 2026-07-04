@@ -28,3 +28,6 @@ coverage/
 # Example apps build artifacts
 examples/*/node_modules/
 examples/*/dist/
+
+# Local Claude Code session dir
+.claude/
