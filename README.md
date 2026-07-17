@@ -208,8 +208,8 @@ and capture a snapshot so I can see it.
 | Option | Default | How to set |
 |--------|---------|-----------|
 | WebSocket port | `7399` | `--port 3200` or `ROMACO_MCP_PORT=3200` |
-| `ROMACO_TOKEN` | _(none → free)_ | API key from [romaco.io](https://romaco.io) — unlocks Pro |
-| `ROMACO_API_URL` | `http://localhost:8000` | ROA-I backend; prod: `https://api.romaco.tech` |
+| `ROMACO_TOKEN` | _(none → free)_ | Unlocks Pro against a self-hosted ROA-I backend (hosted tier coming soon) |
+| `ROMACO_API_URL` | `http://localhost:8000` | ROA-I backend endpoint (self-hosted) |
 | `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + romaco.io)_ | Comma-separated origins for `<McpBridge />` pages on other domains |
 
 **Bridge security**: the WebSocket bridge binds to `127.0.0.1` only (never network-visible) and rejects browser connections from unknown origins — a malicious webpage in your browser can't reach the chart. If your app embeds `<McpBridge />` on its own domain, allow it explicitly:
@@ -245,7 +245,7 @@ With a `ROMACO_TOKEN` set, analysis tools (starting with `romaco_analyze_market`
 forward the heavy compute to ROA-I at `ROMACO_API_URL`. No token, or backend
 unreachable → it falls back to local compute, so the free path never breaks.
 
-Get a key at [romaco.io](https://romaco.io). See `.env.example`.
+A hosted key service is coming soon — today the Pro path runs against a self-hosted backend. See `.env.example`.
 
 ---
 
@@ -272,5 +272,6 @@ Get a key at [romaco.io](https://romaco.io). See `.env.example`.
 ## Links
 
 - [romaco-charts npm](https://www.npmjs.com/package/romaco-charts)
-- [Documentation](https://romaco.io)
+- [Documentation](./docs/INSTALL.md)
+- [romaco.io](https://www.romaco.io)
 - [GitHub](https://github.com/romaco-labs/romaco-mcp)
