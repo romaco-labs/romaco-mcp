@@ -6,10 +6,10 @@
  *        ROA-I backend, falling back to local compute if it is unreachable.
  *
  * Dev:  ROMACO_API_URL=http://localhost:8000 (default).
- * Prod: ROMACO_API_URL=https://api.romaco.tech.
+ * Prod: point ROMACO_API_URL at your self-hosted ROA-I backend.
  */
 
-const DEFAULT_API_URL = 'http://localhost:8000'; // prod: https://api.romaco.tech
+const DEFAULT_API_URL = 'http://localhost:8000'; // prod: self-hosted ROA-I backend
 
 /** Request timeout for gateway calls (ms) — keeps the Pro path from hanging before the local fallback. */
 const GATEWAY_TIMEOUT_MS = 8000;
