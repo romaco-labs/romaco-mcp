@@ -45,9 +45,9 @@ export type BridgeAction =
   | { action: 'getIndicatorValues'; indicatorId?: string; indicatorName?: string }
   | { action: 'goToTimestamp'; timestamp: number }
   | { action: 'listPanes' }
-  | { action: 'removeAlert'; price: number; direction?: 'above' | 'below' | 'cross' }
+  | { action: 'removeAlert'; alertId: string }
   | { action: 'clearAlerts' }
-  | { action: 'removeIndicator'; indicatorType: string }
+  | { action: 'removeIndicator'; indicatorId: string }
   | { action: 'setPriceRange'; min: number; max: number };
 
 // MCP server → Browser

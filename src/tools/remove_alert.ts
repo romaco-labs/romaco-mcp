@@ -18,13 +18,30 @@ export function registerRemoveAlert(server: McpServer): void {
       },
     },
     async ({ price, direction }) => {
+      const context = (await bridge.getContext(false)) as {
+        alerts?: Array<{
+          id?: string;
+          price?: number;
+          direction?: 'above' | 'below' | 'cross';
+        }>;
+      };
+      const alert = context.alerts?.find(
+        (candidate) => candidate.price === price && (!direction || candidate.direction === direction),
+      );
+      if (!alert?.id) {
+        const suffix = direction ? ` (${direction})` : '';
+        return {
+          content: [{ type: 'text' as const, text: `Alert at ${price}${suffix} not found.` }],
+          isError: true,
+        };
+      }
+
       const result = await bridge.executeAction({
         action: 'removeAlert',
-        price,
-        direction,
+        alertId: alert.id,
       });
       if (result.success) {
-        chartState.removeAlert(price, direction ?? 'cross');
+        chartState.removeAlert(price, alert.direction ?? direction ?? 'cross');
         return {
           content: [{ type: 'text' as const, text: `Alert at ${price} removed.` }],
         };
