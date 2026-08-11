@@ -21,6 +21,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "verify:release-version": "node scripts/verify-release-version.mjs",
     "bench": "vitest bench --run"
   },
   "dependencies": {
