@@ -12,7 +12,7 @@ npx @romaco/mcp
 
 ## Philosophy
 
-Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Every tool's typical output is under **2 KB**. Raw payloads (full chart state, snapshots, all-bar indicator series) exist but are **gated** behind `acknowledgeHighTokenCost: true` — the agent must consciously opt in and the user must explicitly request raw data.
+Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Most default tool payloads stay under **2 KB**; `romaco_analyze_market` is the deliberate exception at **2.4–4.1 KB** across the eight recorded 400-bar fixtures. Raw payloads (full chart state, snapshots, all-bar indicator series) exist but are **gated** behind `acknowledgeHighTokenCost: true` — the agent must consciously opt in and the user must explicitly request raw data.
 
 The rule: *the agent never computes, it always queries*. An agent reasoning over computed features can't invent the numbers underneath its analysis — it reads the RSI, the levels, the last price from code, not from its imagination. It still *interprets* them, so the thesis can still be wrong: grounding the data is not the same as grounding the conclusion. But an agent given a 70 KB raw OHLCV dump will burn its context window before it can finish a thought — and invent half the numbers on the way.
 
@@ -20,7 +20,7 @@ The rule: *the agent never computes, it always queries*. An agent reasoning over
 
 | Tool | Default | Gated raw (with `acknowledgeHighTokenCost:true`) |
 |---|---|---|
-| `romaco_analyze_market` | ~3–5 KB compressed MarketSummary | — |
+| `romaco_analyze_market` | 2.4–4.1 KB on recorded 400-bar fixtures | — |
 | `romaco_thesis` | <2 KB computed bull/bear debate + verdict + setup | enhanced server-side thesis (Pro) |
 | `romaco_find_levels` | <500 B | — |
 | `romaco_detect_patterns` | <2 KB (trimmed hits) | full hits with anchor `points[]` |
@@ -51,7 +51,7 @@ Then start Claude Code and prompt:
 
 > Use `romaco_setup_chart` to analyze AAPL daily with the `trend_analysis` preset.
 
-That's it. The MCP server fetches yfinance data (with disk cache + cookie/crumb handshake), runs full technical analysis, and returns a compressed MarketSummary (~500 tokens) to Claude. No 429s, no manual auth.
+That's it. The MCP server fetches yfinance data (with disk cache + cookie/crumb handshake), runs full technical analysis, and returns a compressed MarketSummary. No API key required; the cache reduces repeated upstream requests, but Yahoo can still rate-limit traffic and the server reports that failure explicitly.
 
 ### Live chart control (optional)
 
@@ -162,7 +162,7 @@ Load 500 candles of AAPL 1h from yfinance, then analyze the market.
 
 Claude will call:
 1. `romaco_load_candles` → fetches from Yahoo Finance
-2. `romaco_analyze_market` → returns compressed MarketSummary (~500 tokens)
+2. `romaco_analyze_market` → returns a compressed MarketSummary (2.4–4.1 KB on the recorded 400-bar fixture suite)
 3. `romaco_find_levels` → S/R zones, POC, VAH, VAL
 4. Reasons over the features → tells you what it sees
 
