@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-- **Node.js >= 18** (the server is published as ESM and run with `npx`)
+- **Node.js >= 20** (the server is published as ESM and run with `npx`)
 - **An MCP client** — for example Claude Code, Claude Desktop, or Cursor
 
 You do **not** need a global install. The examples below run the server on demand with `npx`.

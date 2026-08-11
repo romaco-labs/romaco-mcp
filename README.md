@@ -264,7 +264,7 @@ A hosted key service is coming soon — today the Pro path runs against a self-h
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - For chart-bridge tools: romaco-charts >= 1.0.0-beta.6 with `<McpBridge />` in your app
 
 ---
