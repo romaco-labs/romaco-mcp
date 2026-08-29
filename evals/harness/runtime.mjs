@@ -10,6 +10,7 @@ import { OpenPaperPositionUseCase } from '../../dist/application/use-cases/openP
 import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset.js';
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
+import { SerializedActiveSessionActivation } from '../../dist/application/use-cases/serializedActiveSessionActivation.js';
 import { InMemoryApprovalStore } from '../../dist/adapters/outbound/security/InMemoryApprovalStore.js';
 import { InMemoryPaperPositionIdempotencyStore } from '../../dist/adapters/outbound/persistence/InMemoryPaperPositionIdempotencyStore.js';
 import { chartState } from '../../dist/chartState.js';
@@ -130,11 +131,13 @@ export function createEvalRuntime({ marketData, chart }) {
   const projection = new EvalActiveProjection();
   const presets = new EvalPresetCatalog();
   const journal = new EvalChartJournal();
-  const loadDataset = new LoadDatasetUseCase(marketData, datasets, analyses, projection);
+  const activation = new SerializedActiveSessionActivation(datasets, analyses, projection);
+  const loadDataset = new LoadDatasetUseCase(marketData, datasets, activation);
   const resolveThesis = new ResolveThesisArtifactUseCase(
     datasets,
     analyses,
     { read: () => null },
+    activation,
     () => 1_788_000_000_000,
   );
   const setupChart = new SetupChartUseCase(loadDataset, chart, presets, journal);
@@ -148,9 +151,7 @@ export function createEvalRuntime({ marketData, chart }) {
   const analyzeBatch = new AnalyzeBatchUseCase(
     loadDataset,
     resolveThesis,
-    datasets,
-    analyses,
-    projection,
+    activation,
   );
   let approvalCounter = 0;
   const approvals = new InMemoryApprovalStore({
