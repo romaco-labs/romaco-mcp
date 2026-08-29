@@ -16,16 +16,16 @@ export class ResolveThesisArtifactUseCase {
   ) {}
 
   async resolve(analysisId?: string): Promise<AnalysisRecord> {
-    const dataset = await this.requireActiveDataset();
     if (analysisId) {
       const artifact = await this.analyses.get(createAnalysisId(analysisId));
       if (!artifact) throw new Error(`Analysis ${analysisId} not found.`);
-      if (artifact.datasetId !== dataset.datasetId) {
-        throw new Error(`Analysis ${artifact.analysisId} is stale for active dataset ${dataset.datasetId}.`);
-      }
-      await this.analyses.setActive(artifact.analysisId);
+      const dataset = await this.datasets.get(artifact.datasetId);
+      if (!dataset) throw new Error(`Dataset ${artifact.datasetId} not found.`);
+      // Explicit handles are correlation-safe and must not depend on or mutate
+      // process-global active state. Active lookup remains legacy fallback only.
       return artifact;
     }
+    const dataset = await this.requireActiveDataset();
     const active = await this.analyses.getActive();
     if (active?.datasetId === dataset.datasetId) return active;
     const latest = await this.analyses.latestFor(dataset.datasetId);

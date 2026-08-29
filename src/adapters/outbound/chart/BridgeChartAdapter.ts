@@ -82,6 +82,17 @@ function assertIdentity(expected: ChartIdentity | undefined, actual: ChartIdenti
   }
 }
 
+function toBridgeExpectedIdentity(identity: ChartIdentity) {
+  if (!identity.symbol || !identity.timeframe) {
+    throw new Error('Expected chart identity requires chartId, symbol, and timeframe.');
+  }
+  return {
+    chartId: identity.chartId,
+    symbol: identity.symbol,
+    resolution: identity.timeframe,
+  };
+}
+
 function toAgentDrawingInput(drawing: ReplaceDrawingGroupCommand['drawings'][number]) {
   return {
     drawingType: drawing.drawingType,
@@ -114,10 +125,14 @@ export class BridgeChartAdapter implements ChartPort {
     command: ChartCommand,
     options: ChartCommandOptions = {},
   ): Promise<ChartCommandResult> {
-    if (options.expectedIdentity) {
-      assertIdentity(options.expectedIdentity, await this.getIdentity());
-    }
-    return requireSuccess(await this.transport.executeAction(command));
+    const expectedIdentity = options.expectedIdentity;
+    if (expectedIdentity) assertIdentity(expectedIdentity, await this.getIdentity());
+    return requireSuccess(await this.transport.executeAction({
+      ...command,
+      ...(expectedIdentity
+        ? { expectedIdentity: toBridgeExpectedIdentity(expectedIdentity) }
+        : {}),
+    }));
   }
 
   async replaceDrawingGroup(command: ReplaceDrawingGroupCommand): Promise<ChartCommandResult> {
@@ -126,6 +141,7 @@ export class BridgeChartAdapter implements ChartPort {
       action: 'replaceAgentDrawingGroup',
       groupId: command.groupId,
       idempotencyKey: command.idempotencyKey,
+      expectedIdentity: toBridgeExpectedIdentity(command.expectedIdentity),
       drawings: command.drawings.map(toAgentDrawingInput),
     }));
   }

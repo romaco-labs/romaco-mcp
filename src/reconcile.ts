@@ -2,6 +2,7 @@ import { bridge } from './bridge.js';
 import { session } from './session.js';
 import { chartState } from './chartState.js';
 import type { BridgeAction } from './types.js';
+import type { ChartIdentity } from './domain/chart/model.js';
 
 /**
  * Reconcile-on-`ready`: when a (possibly fresh) browser chart connects, replay
@@ -25,6 +26,7 @@ interface ContextDrawing { type: string; points: Array<{ timestamp: number; pric
 interface ContextAlert { price: number; direction?: string }
 interface ReconcileContext {
   symbol?: string | null;
+  resolution?: string | null;
   existingIndicators?: ContextIndicator[];
   existingDrawings?: ContextDrawing[];
   alerts?: ContextAlert[];
@@ -94,6 +96,10 @@ async function tryApply(action: BridgeAction): Promise<void> {
       ?? (typeof data?.drawingId === 'string' ? data.drawingId : undefined)
       ?? (typeof alert?.id === 'string' ? alert.id : undefined);
     if (resourceId) chartState.bindResourceId(action, resourceId);
+    const drawingIds = Array.isArray(data?.drawingIds)
+      ? data.drawingIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    if (drawingIds.length > 0) chartState.bindResourceIds(action, drawingIds);
   } catch (err) {
     console.error(`[romaco-mcp] reconcile: failed to re-apply ${action.action}: ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -105,7 +111,12 @@ export async function reconcileChartState(opts: ReconcileOptions = {}): Promise<
   const gen = ++generation;
 
   const want = chartState.snapshot();
-  if (!want.indicators.length && !want.drawings.length && !want.alerts.length) return;
+  if (
+    !want.indicators.length
+    && !want.drawings.length
+    && !want.drawingGroups.length
+    && !want.alerts.length
+  ) return;
 
   let ctx: ReconcileContext | null = null;
   let lastErr: unknown = null;
@@ -140,6 +151,17 @@ export async function reconcileChartState(opts: ReconcileOptions = {}): Promise<
   // Use the chart's actual loaded symbol (from context) rather than the session's
   // last-load record, which can be stale if the user changed symbols in the browser.
   const symbol = ctx.symbol ?? session.getLastLoad()?.symbol ?? null;
+  const actualIdentity = {
+    chartId: bridge.chartId,
+    symbol: typeof symbol === 'string' ? symbol.toUpperCase() : symbol,
+    timeframe: ctx.resolution ?? null,
+  };
+  const matchesIdentity = (expected: ChartIdentity | undefined): boolean => {
+    if (!expected) return false;
+    return expected.chartId === actualIdentity.chartId
+      && expected.symbol?.toUpperCase() === actualIdentity.symbol
+      && expected.timeframe === actualIdentity.timeframe;
+  };
 
   // Indicators: replay always (symbol-agnostic).
   for (const e of want.indicators) {
@@ -147,14 +169,21 @@ export async function reconcileChartState(opts: ReconcileOptions = {}): Promise<
     if (!hasIndicator(existingIndicators, a)) await tryApply(a);
   }
 
+  // Atomic groups always replay as one idempotent host action. Never decompose
+  // into individual addDrawing calls which could leave a partial visual state.
+  for (const entry of want.drawingGroups) {
+    if (!matchesIdentity(entry.identity)) continue;
+    await tryApply(entry.action);
+  }
+
   // Drawings/alerts: only when the current symbol matches the one they anchor to.
   for (const e of want.drawings) {
-    if (e.symbol !== symbol) continue;
+    if (!matchesIdentity(e.identity)) continue;
     const a = e.action as Extract<BridgeAction, { action: 'addDrawing' }>;
     if (!hasDrawing(existingDrawings, a)) await tryApply(a);
   }
   for (const e of want.alerts) {
-    if (e.symbol !== symbol) continue;
+    if (!matchesIdentity(e.identity)) continue;
     const a = e.action as Extract<BridgeAction, { action: 'addAlert' }>;
     if (!hasAlert(existingAlerts, a)) await tryApply(a);
   }

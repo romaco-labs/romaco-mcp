@@ -70,14 +70,17 @@ describe('ResolveThesisArtifactUseCase', () => {
     expect(await analyses.getActive()).toBeNull();
   });
 
-  it('rejects explicit analysisId after active dataset changes', async () => {
-    const { useCase, datasets } = fixture();
+  it('resolves explicit analysisId independently without mutating active state', async () => {
+    const { useCase, datasets, analyses } = fixture();
     const artifact = await useCase.resolve();
     const other = await datasets.save({
       source: 'raw', symbol: 'MSFT', timeframe: '1d', candles, fetchedAt: 2,
     });
     await datasets.setActive(other.datasetId);
+    await analyses.clearActive();
 
-    await expect(useCase.resolve(artifact.analysisId)).rejects.toThrow(/stale/i);
+    await expect(useCase.resolve(artifact.analysisId)).resolves.toBe(artifact);
+    await expect(datasets.getActive()).resolves.toBe(other);
+    await expect(analyses.getActive()).resolves.toBeNull();
   });
 });

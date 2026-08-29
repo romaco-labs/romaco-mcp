@@ -1,4 +1,5 @@
 import type { BridgeAction } from './types.js';
+import type { ChartIdentity } from './domain/chart/model.js';
 
 /**
  * Desired-state journal for chart mutations applied via the MCP bridge.
@@ -19,13 +20,18 @@ export interface JournalEntry {
   action: BridgeAction;
   /** Symbol active at record time. null = applied with no data loaded. */
   symbol: string | null;
+  /** Canonical live identity when recorded through an identity-aware workflow. */
+  identity?: ChartIdentity;
   /** Browser resource id returned by the most recent successful apply. */
   resourceId?: string;
+  /** Atomic group resources returned by the most recent successful apply. */
+  resourceIds?: readonly string[];
 }
 
 export interface JournalSnapshot {
   indicators: JournalEntry[];
   drawings: JournalEntry[];
+  drawingGroups: JournalEntry[];
   alerts: JournalEntry[];
 }
 
@@ -37,6 +43,7 @@ function indicatorKey(a: Extract<BridgeAction, { action: 'addIndicator' }>): str
 class ChartStateJournal {
   private indicators: JournalEntry[] = [];
   private drawings: JournalEntry[] = [];
+  private drawingGroups: JournalEntry[] = [];
   private alerts: JournalEntry[] = [];
 
   /** Record an applied indicator. Deduped by type+params so replays never stack. */
@@ -62,29 +69,58 @@ class ChartStateJournal {
 
   recordDrawing(
     action: Extract<BridgeAction, { action: 'addDrawing' }>,
-    symbol: string | null,
+    identity: ChartIdentity,
     resourceId?: string,
   ): void {
-    this.drawings.push(resourceId ? { action, symbol, resourceId } : { action, symbol });
+    this.drawings.push({
+      action,
+      symbol: identity.symbol ?? null,
+      identity: { ...identity },
+      ...(resourceId ? { resourceId } : {}),
+    });
   }
 
   recordAlert(
     action: Extract<BridgeAction, { action: 'addAlert' }>,
-    symbol: string | null,
+    identity: ChartIdentity,
     resourceId?: string,
   ): void {
-    this.alerts.push(resourceId ? { action, symbol, resourceId } : { action, symbol });
+    this.alerts.push({
+      action,
+      symbol: identity.symbol ?? null,
+      identity: { ...identity },
+      ...(resourceId ? { resourceId } : {}),
+    });
+  }
+
+  /** Store one complete desired atomic group, never N independently replayed adds. */
+  replaceDrawingGroup(
+    action: Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>,
+    identity: ChartIdentity,
+    resourceIds: readonly string[] = [],
+  ): void {
+    this.removeDrawingsByGroup(action.groupId);
+    this.drawingGroups.push({
+      action,
+      symbol: identity.symbol ?? null,
+      identity: { ...identity },
+      resourceIds: [...resourceIds],
+    });
   }
 
   /** Mirror the clearDrawings bridge action so reconcile won't re-add them. */
   clearDrawings(): void {
     this.drawings = [];
+    this.drawingGroups = [];
   }
 
   /** Drop journaled drawings in a group so reconcile won't replay a replaced set. */
   removeDrawingsByGroup(groupId: string): void {
     this.drawings = this.drawings.filter(
       (e) => (e.action as Extract<BridgeAction, { action: 'addDrawing' }>).groupId !== groupId,
+    );
+    this.drawingGroups = this.drawingGroups.filter(
+      (entry) => (entry.action as Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>).groupId !== groupId,
     );
   }
 
@@ -93,6 +129,7 @@ class ChartStateJournal {
     return {
       indicators: [...this.indicators],
       drawings: [...this.drawings],
+      drawingGroups: [...this.drawingGroups],
       alerts: [...this.alerts],
     };
   }
@@ -148,10 +185,21 @@ class ChartStateJournal {
     if (entry) entry.resourceId = resourceId;
   }
 
+  bindResourceIds(action: BridgeAction, resourceIds: readonly string[]): void {
+    if (action.action !== 'replaceAgentDrawingGroup') return;
+    const entry = this.drawingGroups.find((candidate) =>
+      candidate.action.action === 'replaceAgentDrawingGroup'
+      && candidate.action.groupId === action.groupId
+      && candidate.action.idempotencyKey === action.idempotencyKey
+    );
+    if (entry) entry.resourceIds = [...resourceIds];
+  }
+
   /** Reset everything. Used by tests. */
   clear(): void {
     this.indicators = [];
     this.drawings = [];
+    this.drawingGroups = [];
     this.alerts = [];
   }
 }

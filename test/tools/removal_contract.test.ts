@@ -3,6 +3,11 @@ import { bridge } from '../../src/bridge.js';
 import { chartState } from '../../src/chartState.js';
 import { createTestClient } from './_client.js';
 import type { BridgeAction } from '../../src/types.js';
+import { createChartId } from '../../src/domain/chart/model.js';
+
+const AAPL_DAILY = {
+  chartId: createChartId('primary'), symbol: 'AAPL', timeframe: '1d' as const,
+};
 
 type Harness = Awaited<ReturnType<typeof createTestClient>>;
 
@@ -95,10 +100,10 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
 
   it('removes alert by resourceId and nested options.direction without resurrection', async () => {
     chartState.recordAlert(
-      { action: 'addAlert', price: 200, options: { direction: 'above' } }, 'AAPL', 'alert-above',
+      { action: 'addAlert', price: 200, options: { direction: 'above' } }, AAPL_DAILY, 'alert-above',
     );
     chartState.recordAlert(
-      { action: 'addAlert', price: 200, options: { direction: 'below' } }, 'AAPL', 'alert-below',
+      { action: 'addAlert', price: 200, options: { direction: 'below' } }, AAPL_DAILY, 'alert-below',
     );
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
       alerts: [{ id: 'alert-below', price: 200, direction: 'below' }],

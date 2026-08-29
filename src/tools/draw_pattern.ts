@@ -110,7 +110,6 @@ export function registerDrawPattern(server: McpServer, chart: ChartPort): void {
         };
       }
 
-      const symbol = session.getLastLoad()?.symbol ?? null;
       const groupId = patternGroupId(hit.kind);
 
       // 3. Build complete family payload, then replace it in one chart action.
@@ -130,10 +129,20 @@ export function registerDrawPattern(server: McpServer, chart: ChartPort): void {
           expectedIdentity: expectedIdentity!,
           idempotencyKey,
         });
-        chartState.removeDrawingsByGroup(groupId);
-        drawings.forEach((drawing, index) => {
-          chartState.recordDrawing(drawing, symbol, replaced.resourceIds?.[index]);
-        });
+        const identity = expectedIdentity!;
+        chartState.replaceDrawingGroup({
+          action: 'replaceAgentDrawingGroup',
+          groupId,
+          idempotencyKey,
+          expectedIdentity: {
+            chartId: identity.chartId,
+            symbol: identity.symbol!,
+            resolution: identity.timeframe!,
+          },
+          drawings: drawings.map(({ drawingType, points, label, style, paneId }) => ({
+            drawingType, points, label, style, paneId,
+          })),
+        }, identity, replaced.resourceIds);
       } catch (error) {
         return {
           content: [{ type: 'text' as const, text: `romaco_draw_pattern: ${error instanceof Error ? error.message : String(error)}` }],

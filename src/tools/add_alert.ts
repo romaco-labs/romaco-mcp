@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { bridge } from '../bridge.js';
 import { enrichBridgeResult } from './_guards.js';
 import { chartState } from '../chartState.js';
-import { session } from '../session.js';
+import { requireLiveChartIdentity, toBridgeExpectedIdentity } from './_chartIdentity.js';
 
 export function registerAddAlert(server: McpServer): void {
   server.registerTool(
@@ -26,15 +26,25 @@ export function registerAddAlert(server: McpServer): void {
       },
     },
     async ({ price, direction, note }) => {
+      let identity;
+      try {
+        identity = await requireLiveChartIdentity();
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `romaco_add_alert: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
       const result = await bridge.executeAction({
         action: 'addAlert',
         price,
         options: { direction, note },
+        expectedIdentity: toBridgeExpectedIdentity(identity),
       });
       if (result.success) {
         chartState.recordAlert(
           { action: 'addAlert', price, options: { direction, note } },
-          session.getLastLoad()?.symbol ?? null,
+          identity,
           (result.data as { alert?: { id?: string } } | undefined)?.alert?.id,
         );
         return {

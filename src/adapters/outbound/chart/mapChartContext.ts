@@ -24,14 +24,15 @@ function parseVisibleCandles(value: unknown): ChartContext['visibleCandles'] {
       throw new Error(`Invalid chart candle at index ${index}.`);
     }
     const candle = candidate as Record<string, unknown>;
+    const volume = candle.volume === undefined ? 0 : candle.volume;
     if (
       !finite(candle.timestamp)
       || !finite(candle.open)
       || !finite(candle.high)
       || !finite(candle.low)
       || !finite(candle.close)
-      || !finite(candle.volume)
-      || candle.volume < 0
+      || !finite(volume)
+      || volume < 0
       || candle.high < Math.max(candle.open, candle.low, candle.close)
       || candle.low > Math.min(candle.open, candle.high, candle.close)
     ) {
@@ -43,7 +44,7 @@ function parseVisibleCandles(value: unknown): ChartContext['visibleCandles'] {
       high: candle.high,
       low: candle.low,
       close: candle.close,
-      volume: candle.volume,
+      volume,
     };
   });
 }

@@ -15,7 +15,8 @@ const visibleCandles = [
 ];
 
 async function fixture(chartOverrides: Partial<ChartPort> = {}) {
-  const datasets = new InMemoryDatasetRepository(() => 'dataset');
+  let datasetNumber = 0;
+  const datasets = new InMemoryDatasetRepository(() => String(++datasetNumber));
   const analyses = new InMemoryAnalysisRepository(() => 'analysis');
   const dataset = await datasets.save({
     source: 'raw', symbol: 'TEST', timeframe: '1d', candles, fetchedAt: 1,
@@ -44,7 +45,7 @@ async function fixture(chartOverrides: Partial<ChartPort> = {}) {
     chart,
     { recordIndicator: vi.fn(), replaceDrawingGroup },
   );
-  return { dataset, resolver, chart, replaceDrawingGroup, useCase };
+  return { dataset, datasets, analyses, resolver, chart, replaceDrawingGroup, useCase };
 }
 
 describe('AnnotateThesisUseCase', () => {
@@ -71,6 +72,13 @@ describe('AnnotateThesisUseCase', () => {
     );
     expect(result.artifact).toBe(artifact);
     expect(context.replaceDrawingGroup).toHaveBeenCalledOnce();
+    expect(context.replaceDrawingGroup).toHaveBeenCalledWith(
+      'romaco-mcp/thesis',
+      call.drawings,
+      call.expectedIdentity,
+      call.idempotencyKey,
+      ['drawing-1'],
+    );
   });
 
   it('fails before replacement on symbol or timeframe mismatch', async () => {
@@ -84,6 +92,20 @@ describe('AnnotateThesisUseCase', () => {
     await expect(context.useCase.execute()).rejects.toThrow(/chart shows/i);
     expect(context.chart.replaceDrawingGroup).not.toHaveBeenCalled();
     expect(context.replaceDrawingGroup).not.toHaveBeenCalled();
+  });
+
+  it('keeps an explicit analysis workflow isolated from a later active dataset', async () => {
+    const context = await fixture();
+    const artifact = await context.resolver.resolve();
+    const other = await context.datasets.save({
+      source: 'raw', symbol: 'MSFT', timeframe: '1d', candles, fetchedAt: 2,
+    });
+    await context.datasets.setActive(other.datasetId);
+    await context.analyses.clearActive();
+
+    await expect(context.useCase.execute(artifact.analysisId)).resolves.toMatchObject({ artifact });
+    await expect(context.datasets.getActive()).resolves.toBe(other);
+    await expect(context.analyses.getActive()).resolves.toBeNull();
   });
 
   it('journals nothing when atomic replacement fails', async () => {

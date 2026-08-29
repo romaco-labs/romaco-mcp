@@ -121,7 +121,13 @@ export class AnnotateThesisUseCase {
       expectedIdentity: identity,
       idempotencyKey,
     });
-    this.journal.replaceDrawingGroup(GROUP, drawings, identity, result.resourceIds);
+    this.journal.replaceDrawingGroup(
+      GROUP,
+      drawings,
+      identity,
+      idempotencyKey,
+      result.resourceIds,
+    );
 
     if (setup && Number.isFinite(visLow) && Number.isFinite(visHigh) && visHigh > visLow) {
       const needLow = Math.min(visLow, setup.stop, setup.target);

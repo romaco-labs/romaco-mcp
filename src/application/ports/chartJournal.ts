@@ -12,6 +12,7 @@ export interface ChartJournalPort {
     groupId: string,
     drawings: readonly Extract<ChartCommand, { action: 'addDrawing' }>[],
     identity: ChartIdentity,
+    idempotencyKey: string,
     resourceIds?: readonly string[],
   ): void;
 }

@@ -87,7 +87,14 @@ describe('romaco_annotate (stage 2)', () => {
       expect(draws.some((d) => d.drawingType === 'rectangle')).toBe(true);
       // Everything under the one group, and journaled for replay.
       expect(draws.every((d) => d.groupId === 'romaco-mcp/thesis')).toBe(true);
-      expect(chartState.snapshot().drawings.length).toBe(draws.length);
+      const journal = chartState.snapshot();
+      expect(journal.drawings).toHaveLength(0);
+      expect(journal.drawingGroups).toHaveLength(1);
+      expect(journal.drawingGroups[0].action).toMatchObject({
+        action: 'replaceAgentDrawingGroup',
+        groupId: 'romaco-mcp/thesis',
+        drawings: expect.arrayContaining(draws.map(({ groupId: _groupId, ...drawing }) => drawing)),
+      });
     } finally {
       await close();
     }

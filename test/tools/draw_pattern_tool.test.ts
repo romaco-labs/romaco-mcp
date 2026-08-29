@@ -84,8 +84,15 @@ describe('romaco_draw_pattern', () => {
         }
       }
 
-      // Journaled for replay (reconcile + localStorage rehydration).
-      expect(chartState.snapshot().drawings.length).toBe(draws.length);
+      // Journaled as one atomic desired-state command for reconnect replay.
+      const journal = chartState.snapshot();
+      expect(journal.drawings).toHaveLength(0);
+      expect(journal.drawingGroups).toHaveLength(1);
+      expect(journal.drawingGroups[0].action).toMatchObject({
+        action: 'replaceAgentDrawingGroup',
+        groupId: 'romaco-mcp/pattern/hs',
+        drawings: expect.arrayContaining(draws.map(({ action: _action, groupId: _groupId, ...drawing }) => drawing)),
+      });
     } finally {
       await close();
     }
@@ -96,9 +103,10 @@ describe('romaco_draw_pattern', () => {
     const { callTool, close } = await createTestClient();
     try {
       await callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
-      const afterFirst = chartState.snapshot().drawings.length;
+      const afterFirst = chartState.snapshot().drawingGroups.length;
       await callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
-      expect(chartState.snapshot().drawings.length).toBe(afterFirst);
+      expect(afterFirst).toBe(1);
+      expect(chartState.snapshot().drawingGroups.length).toBe(1);
     } finally {
       await close();
     }

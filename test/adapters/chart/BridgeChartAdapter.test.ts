@@ -78,6 +78,7 @@ describe('BridgeChartAdapter', () => {
       action: 'replaceAgentDrawingGroup',
       groupId: 'romaco-mcp/thesis',
       idempotencyKey: 'analysis_1:primary',
+      expectedIdentity: { chartId: 'primary', symbol: 'AAPL', resolution: '1h' },
       drawings: [{
         drawingType: 'horizontalLine',
         points: [{ timestamp: 1_000, price: 100 }],
@@ -99,6 +100,26 @@ describe('BridgeChartAdapter', () => {
     expect(fake.executeAction).not.toHaveBeenCalled();
   });
 
+  it('carries expected identity inside ordinary outbound actions for host-side revalidation', async () => {
+    const fake = transport();
+    const adapter = new BridgeChartAdapter(fake);
+    const expectedIdentity = {
+      chartId: createChartId('primary'), symbol: 'AAPL', timeframe: '1h' as const,
+    };
+
+    await adapter.execute(
+      { action: 'addIndicator', indicatorType: 'RSI', params: [14] },
+      { expectedIdentity },
+    );
+
+    expect(fake.executeAction).toHaveBeenCalledWith({
+      action: 'addIndicator',
+      indicatorType: 'RSI',
+      params: [14],
+      expectedIdentity: { chartId: 'primary', symbol: 'AAPL', resolution: '1h' },
+    });
+  });
+
   it('rejects malformed visible candle arrays at the adapter boundary', async () => {
     const adapter = new BridgeChartAdapter(transport({
       getContext: vi.fn(async () => ({
@@ -116,5 +137,25 @@ describe('BridgeChartAdapter', () => {
     }));
 
     await expect(adapter.getContext({ includeCandles: true })).rejects.toThrow(/chart candle/i);
+  });
+
+  it('normalizes omitted chart volume to zero while retaining numeric validation', async () => {
+    const adapter = new BridgeChartAdapter(transport({
+      getContext: vi.fn(async () => ({
+        symbol: 'AAPL',
+        resolution: '1h',
+        visibleCandles: [{
+          timestamp: 1_000,
+          open: 100,
+          high: 101,
+          low: 99,
+          close: 100,
+        }],
+      })),
+    }));
+
+    await expect(adapter.getContext({ includeCandles: true })).resolves.toMatchObject({
+      visibleCandles: [{ volume: 0 }],
+    });
   });
 });

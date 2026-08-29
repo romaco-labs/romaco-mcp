@@ -21,11 +21,28 @@ export class LegacyChartJournal implements ChartJournalPort {
     groupId: string,
     drawings: readonly Extract<ChartCommand, { action: 'addDrawing' }>[],
     identity: ChartIdentity,
+    idempotencyKey: string,
     resourceIds: readonly string[] = [],
   ): void {
-    chartState.removeDrawingsByGroup(groupId);
-    drawings.forEach((drawing, index) => {
-      chartState.recordDrawing(drawing, identity.symbol ?? null, resourceIds[index]);
-    });
+    if (!identity.symbol || !identity.timeframe) {
+      throw new Error('Drawing journal identity requires chartId, symbol, and timeframe.');
+    }
+    chartState.replaceDrawingGroup({
+      action: 'replaceAgentDrawingGroup',
+      groupId,
+      idempotencyKey,
+      expectedIdentity: {
+        chartId: identity.chartId,
+        symbol: identity.symbol,
+        resolution: identity.timeframe,
+      },
+      drawings: drawings.map(({ drawingType, points, label, style, paneId }) => ({
+        drawingType,
+        points,
+        label,
+        style,
+        paneId,
+      })),
+    }, identity, resourceIds);
   }
 }

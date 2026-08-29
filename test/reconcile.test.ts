@@ -4,6 +4,7 @@ import { chartState } from '../src/chartState.js';
 import { bridge } from '../src/bridge.js';
 import { session } from '../src/session.js';
 import type { LoadResponse } from '../src/data/types.js';
+import { createChartId } from '../src/domain/chart/model.js';
 
 const EMA20 = { action: 'addIndicator', indicatorType: 'EMA', params: [20] } as const;
 const TREND = {
@@ -12,6 +13,25 @@ const TREND = {
   points: [{ timestamp: 1, price: 10 }, { timestamp: 2, price: 20 }],
 } as const;
 const ALERT = { action: 'addAlert', price: 150, options: { direction: 'above' as const } } as const;
+const AAPL_DAILY = {
+  chartId: createChartId('primary'),
+  symbol: 'AAPL',
+  timeframe: '1d' as const,
+};
+const chartIdentity = (symbol: string, timeframe: '1d' | '1h' = '1d') => ({
+  chartId: createChartId('primary'), symbol, timeframe,
+});
+const THESIS_GROUP = {
+  action: 'replaceAgentDrawingGroup' as const,
+  groupId: 'romaco-mcp/thesis',
+  idempotencyKey: 'analysis_1:primary:thesis-v1',
+  drawings: [{
+    drawingType: 'horizontalLine',
+    points: [{ timestamp: 1, price: 10 }],
+    label: 'entry',
+  }],
+  expectedIdentity: { chartId: 'primary', symbol: 'AAPL', resolution: '1d' },
+};
 
 /** Stub session so the "current symbol" is deterministic. */
 function loadSymbol(symbol: string | null): void {
@@ -33,6 +53,7 @@ afterEach(() => {
 beforeEach(() => {
   // Default: every executeAction succeeds.
   vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
+  vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('primary');
 });
 
 describe('reconcileChartState', () => {
@@ -44,10 +65,10 @@ describe('reconcileChartState', () => {
 
   it('fresh chart (empty context) → replays indicators + drawings + alerts', async () => {
     chartState.recordIndicator(EMA20, 'AAPL');
-    chartState.recordDrawing(TREND, 'AAPL');
-    chartState.recordAlert(ALERT, 'AAPL');
+    chartState.recordDrawing(TREND, AAPL_DAILY);
+    chartState.recordAlert(ALERT, AAPL_DAILY);
     loadSymbol('AAPL');
-    ctx({ existingIndicators: [], existingDrawings: [], alerts: [] });
+    ctx({ symbol: 'AAPL', resolution: '1d', existingIndicators: [], existingDrawings: [], alerts: [] });
 
     await reconcileChartState();
 
@@ -61,13 +82,15 @@ describe('reconcileChartState', () => {
 
   it('same chart (context already has everything) → applies nothing (idempotent)', async () => {
     chartState.recordIndicator(EMA20, 'AAPL');
-    chartState.recordDrawing(TREND, 'AAPL');
-    chartState.recordAlert(ALERT, 'AAPL');
+    chartState.recordDrawing(TREND, AAPL_DAILY);
+    chartState.recordAlert(ALERT, AAPL_DAILY);
     loadSymbol('AAPL');
     ctx({
       existingIndicators: [{ name: 'EMA', params: [20], visible: true }],
       existingDrawings: [{ type: 'trendline', points: [{ timestamp: 1, price: 10 }, { timestamp: 2, price: 20 }] }],
       alerts: [{ price: 150, direction: 'above' }],
+      symbol: 'AAPL',
+      resolution: '1d',
     });
 
     await reconcileChartState();
@@ -77,16 +100,81 @@ describe('reconcileChartState', () => {
 
   it('different symbol → indicators replay, drawings/alerts skipped', async () => {
     chartState.recordIndicator(EMA20, 'AAPL');
-    chartState.recordDrawing(TREND, 'AAPL');
-    chartState.recordAlert(ALERT, 'AAPL');
+    chartState.recordDrawing(TREND, AAPL_DAILY);
+    chartState.recordAlert(ALERT, AAPL_DAILY);
     loadSymbol('MSFT'); // chart now showing a different symbol
-    ctx({ existingIndicators: [], existingDrawings: [], alerts: [] });
+    ctx({ symbol: 'MSFT', resolution: '1d', existingIndicators: [], existingDrawings: [], alerts: [] });
 
     await reconcileChartState();
 
     const exec = bridge.executeAction as ReturnType<typeof vi.fn>;
     expect(exec).toHaveBeenCalledTimes(1);
     expect(exec.mock.calls[0][0]).toEqual(EMA20);
+  });
+
+  it('same symbol with wrong timeframe skips identity-bound atomic groups', async () => {
+    chartState.replaceDrawingGroup(THESIS_GROUP, AAPL_DAILY);
+    ctx({
+      symbol: 'AAPL',
+      resolution: '1h',
+      existingIndicators: [],
+      existingDrawings: [],
+      alerts: [],
+      totalCandles: 300,
+    });
+
+    await reconcileChartState();
+
+    expect(bridge.executeAction).not.toHaveBeenCalled();
+  });
+
+  it('same symbol with wrong timeframe skips direct drawings and alerts', async () => {
+    chartState.recordDrawing(TREND, AAPL_DAILY);
+    chartState.recordAlert(ALERT, AAPL_DAILY);
+    ctx({
+      symbol: 'AAPL', resolution: '1h',
+      existingIndicators: [], existingDrawings: [], alerts: [], totalCandles: 300,
+    });
+
+    await reconcileChartState();
+
+    expect(bridge.executeAction).not.toHaveBeenCalled();
+  });
+
+  it('matching reconnect replays one atomic group command and zero individual adds', async () => {
+    chartState.replaceDrawingGroup(THESIS_GROUP, AAPL_DAILY, ['drawing-1']);
+    ctx({
+      symbol: 'AAPL',
+      resolution: '1d',
+      existingIndicators: [],
+      existingDrawings: [],
+      alerts: [],
+      totalCandles: 300,
+    });
+
+    await reconcileChartState();
+
+    expect(bridge.executeAction).toHaveBeenCalledOnce();
+    expect(bridge.executeAction).toHaveBeenCalledWith(THESIS_GROUP);
+    expect(
+      vi.mocked(bridge.executeAction).mock.calls.filter(([action]) => action.action === 'addDrawing'),
+    ).toHaveLength(0);
+  });
+
+  it('failed atomic replay keeps one complete desired group and no partial entries', async () => {
+    chartState.replaceDrawingGroup(THESIS_GROUP, AAPL_DAILY, ['drawing-1']);
+    ctx({
+      symbol: 'AAPL', resolution: '1d', existingDrawings: [], totalCandles: 300,
+    });
+    vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: false, error: 'host denied' });
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await reconcileChartState();
+
+    const state = chartState.snapshot();
+    expect(state.drawingGroups).toHaveLength(1);
+    expect(state.drawingGroups[0].action).toEqual(THESIS_GROUP);
+    expect(state.drawings).toHaveLength(0);
   });
 
   it('partial context → only the missing overlay is applied', async () => {
@@ -147,11 +235,14 @@ describe('reconcileChartState', () => {
   });
 
   it('"Chart not ready" on first attempt → retries until context appears, then replays', async () => {
-    chartState.recordDrawing(TREND, 'AAPL');
+    chartState.recordDrawing(TREND, AAPL_DAILY);
     loadSymbol('AAPL');
     vi.spyOn(bridge, 'getContext')
       .mockRejectedValueOnce(new Error('Chart not ready'))
-      .mockResolvedValue({ existingIndicators: [], existingDrawings: [], alerts: [], totalCandles: 300 });
+      .mockResolvedValue({
+        symbol: 'AAPL', resolution: '1d',
+        existingIndicators: [], existingDrawings: [], alerts: [], totalCandles: 300,
+      });
 
     await reconcileChartState({ delayMs: 1 });
 
@@ -161,12 +252,15 @@ describe('reconcileChartState', () => {
   });
 
   it('chart shell with zero candles → waits for data before replaying', async () => {
-    chartState.recordDrawing(TREND, 'AAPL');
+    chartState.recordDrawing(TREND, AAPL_DAILY);
     loadSymbol('AAPL');
     const getCtx = vi
       .spyOn(bridge, 'getContext')
       .mockResolvedValueOnce({ existingDrawings: [], totalCandles: 0 })
-      .mockResolvedValue({ existingIndicators: [], existingDrawings: [], alerts: [], totalCandles: 300 });
+      .mockResolvedValue({
+        symbol: 'AAPL', resolution: '1d',
+        existingIndicators: [], existingDrawings: [], alerts: [], totalCandles: 300,
+      });
 
     await reconcileChartState({ delayMs: 1 });
 
@@ -175,9 +269,12 @@ describe('reconcileChartState', () => {
   });
 
   it('prefers the chart-reported symbol over a stale session symbol', async () => {
-    chartState.recordDrawing(TREND, 'NVDA');
+    chartState.recordDrawing(TREND, chartIdentity('NVDA'));
     loadSymbol('AAPL'); // session is stale — the browser switched to NVDA
-    ctx({ existingIndicators: [], existingDrawings: [], alerts: [], symbol: 'NVDA', totalCandles: 300 });
+    ctx({
+      existingIndicators: [], existingDrawings: [], alerts: [],
+      symbol: 'NVDA', resolution: '1d', totalCandles: 300,
+    });
 
     await reconcileChartState();
 
@@ -187,9 +284,12 @@ describe('reconcileChartState', () => {
   });
 
   it('omitted alert direction matches a "cross" alert in context (no double-add)', async () => {
-    chartState.recordAlert({ action: 'addAlert', price: 99, options: {} }, 'AAPL');
+    chartState.recordAlert({ action: 'addAlert', price: 99, options: {} }, AAPL_DAILY);
     loadSymbol('AAPL');
-    ctx({ existingIndicators: [], existingDrawings: [], alerts: [{ price: 99, direction: 'cross' }] });
+    ctx({
+      symbol: 'AAPL', resolution: '1d',
+      existingIndicators: [], existingDrawings: [], alerts: [{ price: 99, direction: 'cross' }],
+    });
 
     await reconcileChartState();
 

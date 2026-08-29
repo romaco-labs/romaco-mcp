@@ -33,9 +33,19 @@ export interface BridgeAddDrawingAction {
 
 export type BridgeAgentDrawingInput = Omit<BridgeAddDrawingAction, 'action' | 'groupId'>;
 
+export interface BridgeExpectedIdentity {
+  chartId: string;
+  symbol: string;
+  resolution: string;
+}
+
+type WithExpectedIdentity<T> = T extends unknown
+  ? T & { expectedIdentity?: BridgeExpectedIdentity }
+  : never;
+
 // Subset of ChartAction shapes the MCP server constructs and sends to the
 // browser. The browser executes them via ChartAgentController.executeAction().
-export type BridgeAction =
+type BridgeActionPayload =
   | { action: 'addIndicator'; indicatorType: string; params?: number[] }
   | BridgeAddDrawingAction
   | { action: 'zoomIn'; factor?: number }
@@ -59,6 +69,8 @@ export type BridgeAction =
   | { action: 'clearAlerts' }
   | { action: 'removeIndicator'; indicatorId: string }
   | { action: 'setPriceRange'; min: number; max: number };
+
+export type BridgeAction = WithExpectedIdentity<BridgeActionPayload>;
 
 // MCP server → Browser
 export type BridgeServerMessage =
