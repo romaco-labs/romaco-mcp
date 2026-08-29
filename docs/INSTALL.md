@@ -118,6 +118,13 @@ export function Terminal() {
 
 With the bridge connected, the chart-bridge tools become live. If the bridge is not mounted, those tools simply have nothing to talk to — the headless tools keep working regardless.
 
+`romaco_annotate` is intentionally two-step. First call returns
+`APPROVAL_REQUIRED` plus a short-lived token and performs zero chart writes. After
+the user approves that exact `analysisId`, retry with `analysisId` and
+`approvalToken`. Tokens are process-local, scope-bound, single-use, and rejected
+after expiry or replay. Agent/client remains responsible for waiting for actual
+user approval before sending the confirmation token.
+
 ## Configuration
 
 All configuration is via environment variables. Set them in your MCP client's server config (an `env` block) or in your shell before launching the server.

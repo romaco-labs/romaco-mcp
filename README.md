@@ -6,7 +6,7 @@ MCP server for [romaco-charts](https://www.npmjs.com/package/romaco-charts). Con
 npx @romaco/mcp
 ```
 
-![romaco-mcp — an AI agent draws technical analysis on a live chart, grounded in deterministic math (not a hallucinated number in sight)](docs/demo.gif)
+![romaco-mcp — an AI agent draws code-computed technical analysis on a live chart](docs/demo.gif)
 
 ---
 
@@ -14,7 +14,11 @@ npx @romaco/mcp
 
 Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Most default tool payloads stay under **2 KB**; `romaco_analyze_market` is the deliberate exception at **2.4–4.1 KB** across the eight recorded 400-bar fixtures. Large payloads such as snapshots, visible-candle arrays, and all-bar indicator series are **gated** behind `acknowledgeHighTokenCost: true`. Full raw chart-state export is disabled until an explicitly authorized host contract exists.
 
-The rule: *the agent never computes, it always queries*. An agent reasoning over computed features can't invent the numbers underneath its analysis — it reads the RSI, the levels, the last price from code, not from its imagination. It still *interprets* them, so the thesis can still be wrong: grounding the data is not the same as grounding the conclusion. But an agent given a 70 KB raw OHLCV dump will burn its context window before it can finish a thought — and invent half the numbers on the way.
+The rule: *code computes; the agent queries and interprets*. RSI, levels, and last
+price come from structured tool output. This reduces unsupported numeric claims;
+it cannot prevent an agent from misquoting evidence or reaching a wrong thesis.
+Grounding data is not grounding the conclusion. Compression also preserves more
+context than returning a large raw OHLCV dump by default.
 
 ### Cost table
 
@@ -73,7 +77,7 @@ function App() {
 }
 ```
 
-See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a complete setup. With `<McpBridge />` mounted, the chart-bridge tools (`add_indicator`, `add_drawing`, `add_alert`, `capture_snapshot`, …) become available. Atomic thesis/pattern annotation additionally requires the host action documented in [Chart bridge compatibility](./docs/CHART_BRIDGE_COMPATIBILITY.md); older hosts fail closed instead of falling back to sequential drawing writes.
+See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a complete setup. With `<McpBridge />` mounted, the chart-bridge tools (`add_indicator`, `add_drawing`, `add_alert`, `capture_snapshot`, …) become available. Atomic thesis/pattern annotation additionally requires the host action documented in [Chart bridge compatibility](./docs/CHART_BRIDGE_COMPATIBILITY.md); older hosts fail closed instead of falling back to sequential drawing writes. `romaco_annotate` also uses a two-step, one-time confirmation challenge: its first call performs zero writes and returns `APPROVAL_REQUIRED`; retry only after the user approves the exact `analysisId`.
 
 ### Data cache
 
@@ -99,13 +103,14 @@ Exposes 20+ MCP tools in two categories:
 - `romaco_add_alert` — price alerts with direction (above/below/cross)
 - `romaco_capture_snapshot` — PNG/JPEG base64 for vision LLMs
 - `romaco_open_paper_position` — simulated long/short with SL/TP
-- `romaco_get_chart_context` — complete chart state as JSON
+- `romaco_get_chart_context` — concise live chart state; raw chart export is disabled
 - `romaco_get_visible_candles` — OHLCV in current viewport
 - `romaco_set_zoom` / `romaco_reset_view` — zoom control
 - `romaco_clear_drawings` — remove all drawings
 - `romaco_list_panes` — enumerate main + subpanel panes (e.g. RSI subpanel id)
 - `romaco_get_indicator_values` — read computed indicator series (by id or name)
 - `romaco_go_to_timestamp` — scrub viewport to a given timestamp
+- `romaco_annotate` — atomically draw one exact thesis after a scoped, one-time confirmation challenge
 
 ---
 
@@ -191,6 +196,22 @@ Then from Claude:
 Add EMA 20 and RSI 14 to the chart, draw a Fibonacci from the last swing low to swing high,
 and capture a snapshot so I can see it.
 ```
+
+For `romaco_annotate`, first call returns a scoped token and writes nothing. MCP
+rejects missing, expired, wrong-scope, and replayed tokens. Agent/client must send
+the token only after explicit user approval. Token proves completion of the
+two-step protocol; by itself it cannot cryptographically prove human intent.
+
+---
+
+## Evaluation status
+
+`npm run eval:offline` validates 28 declared scenarios and currently executes 12
+deterministic MCP conformance workflows; 16 remain explicitly `planned`. Reported
+success rate uses executed runnable workflows as denominator and always reports
+planned work separately. Runnable failures or missing runnable workflow/grader
+implementations exit non-zero. Numeric agent-final-answer grading remains planned;
+current `evidence-conformance` checks structured tool evidence, not model prose.
 
 ---
 
