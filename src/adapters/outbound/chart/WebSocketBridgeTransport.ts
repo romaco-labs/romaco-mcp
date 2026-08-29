@@ -7,6 +7,7 @@ import type { ActionResult, BridgeAction, BridgeClientMessage, BridgeServerMessa
 const REQUEST_TIMEOUT_MS = 8_000;
 const REBIND_MS = 5_000;
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+export const BRIDGE_MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
 
 type ConnectionPhase = 'hello' | 'challenge' | 'authenticated' | 'ready' | 'legacy';
 
@@ -82,7 +83,11 @@ export class WebSocketBridgeTransport {
   }
 
   private bind(onSettled?: () => void): void {
-    const wss = new WebSocketServer({ port: this.config.port, host: '127.0.0.1' });
+    const wss = new WebSocketServer({
+      port: this.config.port,
+      host: '127.0.0.1',
+      maxPayload: BRIDGE_MAX_PAYLOAD_BYTES,
+    });
     this.wss = wss;
     wss.on('error', (error) => {
       if ((error as NodeJS.ErrnoException).code === 'EADDRINUSE') {

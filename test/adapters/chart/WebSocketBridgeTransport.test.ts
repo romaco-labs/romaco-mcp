@@ -2,7 +2,10 @@ import { randomBytes } from 'node:crypto';
 import { afterEach, describe, expect, it } from 'vitest';
 import { WebSocket } from 'ws';
 import { createBridgeProof, parsePairingToken, verifyBridgeProof } from '../../../src/adapters/outbound/chart/bridgeAuth.js';
-import { WebSocketBridgeTransport } from '../../../src/adapters/outbound/chart/WebSocketBridgeTransport.js';
+import {
+  BRIDGE_MAX_PAYLOAD_BYTES,
+  WebSocketBridgeTransport,
+} from '../../../src/adapters/outbound/chart/WebSocketBridgeTransport.js';
 import { resolveBridgeConfig } from '../../../src/bootstrap/bridgeConfig.js';
 
 const TOKEN = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8';
@@ -162,6 +165,14 @@ describe('WebSocketBridgeTransport paired v2', () => {
     const { port } = await start(25);
     const ws = await connect(port);
     expect(await closed(ws)).toBe(4408);
+  });
+
+  it('rejects oversized browser frames before authentication parsing', async () => {
+    const { port } = await start();
+    const ws = await connect(port);
+    const closePromise = closed(ws);
+    ws.send(Buffer.alloc(BRIDGE_MAX_PAYLOAD_BYTES + 1, 0x78));
+    expect(await closePromise).toBe(1009);
   });
 
   it('never transmits the pairing token in server frames', async () => {
