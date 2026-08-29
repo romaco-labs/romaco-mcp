@@ -23,6 +23,7 @@ import { OpenPaperPositionUseCase } from '../application/use-cases/openPaperPosi
 import { InMemoryPaperPositionIdempotencyStore } from '../adapters/outbound/persistence/InMemoryPaperPositionIdempotencyStore.js';
 import { ReconcileChartStateUseCase } from '../application/use-cases/reconcileChartState.js';
 import { ClearAlertsUseCase } from '../application/use-cases/clearAlerts.js';
+import { SerializedActiveSessionActivation } from '../application/use-cases/serializedActiveSessionActivation.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -50,11 +51,15 @@ export function createProductionRuntime(): ApplicationRuntime {
   const presets = new LegacyPresetCatalog();
   const marketData = new LegacyMarketDataAdapter();
   const activeProjection = new LegacySessionProjection();
-  const loadDataset = new LoadDatasetUseCase(
-    marketData,
+  const activeSessionActivation = new SerializedActiveSessionActivation(
     datasets,
     analyses,
     activeProjection,
+  );
+  const loadDataset = new LoadDatasetUseCase(
+    marketData,
+    datasets,
+    activeSessionActivation,
   );
   const journal = new LegacyChartJournal();
   const drawingTemplates = new LegacyDrawingTemplateCatalog();
@@ -80,9 +85,7 @@ export function createProductionRuntime(): ApplicationRuntime {
     analyzeBatch: new AnalyzeBatchUseCase(
       loadDataset,
       resolveThesis,
-      datasets,
-      analyses,
-      activeProjection,
+      activeSessionActivation,
     ),
     clearAgentDrawings: new ClearAgentDrawingsUseCase(chart, agentDrawingJournal),
     clearAlerts: new ClearAlertsUseCase(chart, journal),

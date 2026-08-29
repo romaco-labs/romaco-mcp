@@ -1,8 +1,6 @@
 import type { AnalysisRecord } from '../../domain/analysis/model.js';
 import type { DatasetRecord, Timeframe } from '../../domain/dataset/model.js';
-import type { ActiveDatasetProjection } from '../ports/activeDatasetProjection.js';
-import type { AnalysisRepository } from '../ports/analysisRepository.js';
-import type { DatasetRepository } from '../ports/datasetRepository.js';
+import type { ActiveSessionActivationPort } from '../ports/activeSessionActivation.js';
 import type { LoadDatasetUseCase } from './loadDataset.js';
 import type { ResolveThesisArtifactUseCase } from './resolveThesisArtifact.js';
 
@@ -34,9 +32,7 @@ export class AnalyzeBatchUseCase {
   constructor(
     private readonly loadDataset: LoadDatasetUseCase,
     private readonly resolveThesis: ResolveThesisArtifactUseCase,
-    private readonly datasets: DatasetRepository,
-    private readonly analyses: AnalysisRepository,
-    private readonly activeProjection: ActiveDatasetProjection,
+    private readonly activation: ActiveSessionActivationPort,
   ) {}
 
   async execute(request: AnalyzeBatchRequest): Promise<AnalyzeBatchResult> {
@@ -70,9 +66,7 @@ export class AnalyzeBatchUseCase {
       || left.dataset.symbol.localeCompare(right.dataset.symbol)
     );
     const top = items[0];
-    await this.datasets.setActive(top.dataset.datasetId);
-    await this.analyses.setActive(top.artifact.analysisId);
-    this.activeProjection.replace(top.dataset);
+    await this.activation.activateAnalysis(top.dataset, top.artifact);
     return { items, top, failures };
   }
 }

@@ -6,6 +6,7 @@ import type { ActiveDatasetProjection } from '../../src/application/ports/active
 import type { MarketDataPort } from '../../src/application/ports/marketData.js';
 import type { MarketSummary } from '../../src/compression/types.js';
 import type { TradeThesis } from '../../src/compression/thesis.js';
+import { SerializedActiveSessionActivation } from '../../src/application/use-cases/serializedActiveSessionActivation.js';
 
 const candles = [{ timestamp: 1, open: 10, high: 12, low: 9, close: 11, volume: 100 }];
 
@@ -35,7 +36,8 @@ describe('LoadDatasetUseCase', () => {
     };
     const replace = vi.fn();
     const projection: ActiveDatasetProjection = { replace };
-    const useCase = new LoadDatasetUseCase(marketData, datasets, analyses, projection);
+    const activation = new SerializedActiveSessionActivation(datasets, analyses, projection);
+    const useCase = new LoadDatasetUseCase(marketData, datasets, activation);
 
     const loaded = await useCase.execute({ source: 'raw', symbol: ' aapl ', timeframe: '1h' });
 
@@ -66,7 +68,8 @@ describe('LoadDatasetUseCase', () => {
     const failure = new Error('upstream unavailable');
     const marketData: MarketDataPort = { load: vi.fn(async () => { throw failure; }) };
     const replace = vi.fn();
-    const useCase = new LoadDatasetUseCase(marketData, datasets, analyses, { replace });
+    const activation = new SerializedActiveSessionActivation(datasets, analyses, { replace });
+    const useCase = new LoadDatasetUseCase(marketData, datasets, activation);
 
     await expect(useCase.execute({
       source: 'yfinance', symbol: 'AAPL', timeframe: '1h',
@@ -94,11 +97,12 @@ describe('LoadDatasetUseCase', () => {
     });
     await analyses.setActive(activeAnalysis.analysisId);
     const replace = vi.fn();
+    const activation = new SerializedActiveSessionActivation(datasets, analyses, { replace });
     const useCase = new LoadDatasetUseCase({
       load: vi.fn(async () => ({
         source: 'yfinance', symbol: 'AAPL', timeframe: '1d', candles, fetchedAt: 2,
       })),
-    }, datasets, analyses, { replace });
+    }, datasets, activation);
 
     const candidate = await useCase.loadDetached({
       source: 'yfinance', symbol: 'AAPL', timeframe: '1d',
