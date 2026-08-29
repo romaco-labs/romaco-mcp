@@ -1,0 +1,6 @@
+{
+  "kind": "chart-fault",
+  "operation": "replaceDrawingGroup",
+  "disconnectAfterStep": "remove-old-group",
+  "reconnect": true
+}

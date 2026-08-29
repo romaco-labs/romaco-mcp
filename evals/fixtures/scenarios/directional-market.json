@@ -1,0 +1,10 @@
+{
+  "kind": "synthetic-candles",
+  "generator": "directional",
+  "symbol": "TREND",
+  "timeframe": "1h",
+  "bars": 180,
+  "startPrice": 80,
+  "endPrice": 120,
+  "pullbackEveryBars": 18
+}

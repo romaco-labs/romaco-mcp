@@ -1,0 +1,12 @@
+{
+  "kind": "chart-state",
+  "chartId": "chart_user_state",
+  "symbol": "AAPL",
+  "timeframe": "1d",
+  "datasetId": "fixture:real-aapl",
+  "drawings": [
+    { "id": "user_drawing_1", "owner": "user", "groupId": null, "type": "trendline" }
+  ],
+  "indicators": [],
+  "alerts": []
+}

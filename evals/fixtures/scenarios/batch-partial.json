@@ -1,0 +1,8 @@
+{
+  "kind": "market-data-map",
+  "symbols": {
+    "AAPL": "test/fixtures/real/AAPL_1d_400.json",
+    "SPY": "test/fixtures/real/SPY_1d_400.json",
+    "MISSING": { "errorCode": "DATA_SOURCE_UNAVAILABLE" }
+  }
+}

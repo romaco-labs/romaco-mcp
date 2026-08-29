@@ -1,0 +1,52 @@
+[
+  {
+    "id": "contract",
+    "status": "planned",
+    "description": "Validate advertised outputSchema, structuredContent, error envelope, and identity continuity."
+  },
+  {
+    "id": "terminal-state",
+    "status": "planned",
+    "description": "Inspect final fake-port state without requiring one exact tool trajectory."
+  },
+  {
+    "id": "financial-invariants",
+    "status": "planned",
+    "description": "Recalculate side geometry, reward/risk, commissions, and account-risk caps."
+  },
+  {
+    "id": "safety",
+    "status": "planned",
+    "description": "Require zero cross-symbol or unauthorized writes and enforce single-use approvals."
+  },
+  {
+    "id": "claims",
+    "status": "planned",
+    "description": "Match numeric final-answer claims to tool evidence within task tolerances."
+  },
+  {
+    "id": "trace",
+    "status": "planned",
+    "description": "Check trace completeness, downstream outcomes, and telemetry redaction."
+  },
+  {
+    "id": "budget",
+    "status": "planned",
+    "description": "Enforce tool-call, result-byte, and duration budgets."
+  },
+  {
+    "id": "tool-policy",
+    "status": "planned",
+    "description": "Check allowed/forbidden capabilities without demanding one exact call sequence."
+  },
+  {
+    "id": "identity",
+    "status": "planned",
+    "description": "Check chartId, datasetId, analysisId, symbol, and timeframe bindings."
+  },
+  {
+    "id": "recovery",
+    "status": "planned",
+    "description": "Check stable error codes, retryability, and actionable recovery guidance."
+  }
+]

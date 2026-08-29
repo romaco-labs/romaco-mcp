@@ -1,0 +1,6 @@
+{
+  "kind": "reconnect-sequence",
+  "initialChart": { "chartId": "chart_a", "symbol": "AAPL", "timeframe": "1d" },
+  "replacementChart": { "chartId": "chart_b", "symbol": "TSLA", "timeframe": "1d" },
+  "disconnectAfterActions": null
+}

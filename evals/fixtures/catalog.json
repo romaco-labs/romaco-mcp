@@ -1,0 +1,15 @@
+[
+  { "id": "real-aapl", "file": "test/fixtures/real/AAPL_1d_400.json" },
+  { "id": "real-tsla", "file": "test/fixtures/real/TSLA_1d_400.json" },
+  { "id": "real-spy", "file": "test/fixtures/real/SPY_1d_400.json" },
+  { "id": "flat-market", "file": "evals/fixtures/scenarios/flat-market.json" },
+  { "id": "directional-market", "file": "evals/fixtures/scenarios/directional-market.json" },
+  { "id": "batch-partial", "file": "evals/fixtures/scenarios/batch-partial.json" },
+  { "id": "chart-aapl", "file": "evals/fixtures/scenarios/chart-aapl.json" },
+  { "id": "chart-tsla-mismatch", "file": "evals/fixtures/scenarios/chart-tsla-mismatch.json" },
+  { "id": "chart-user-drawings", "file": "evals/fixtures/scenarios/chart-user-drawings.json" },
+  { "id": "reconnect-state", "file": "evals/fixtures/scenarios/reconnect-state.json" },
+  { "id": "approval-state", "file": "evals/fixtures/scenarios/approval-state.json" },
+  { "id": "gateway-timeout", "file": "evals/fixtures/scenarios/gateway-timeout.json" },
+  { "id": "bridge-disconnect", "file": "evals/fixtures/scenarios/bridge-disconnect.json" }
+]

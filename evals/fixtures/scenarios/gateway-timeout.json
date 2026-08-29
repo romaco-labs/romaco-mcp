@@ -1,0 +1,7 @@
+{
+  "kind": "gateway-fault",
+  "operation": "analyze",
+  "errorCode": "GATEWAY_UNAVAILABLE",
+  "delayMs": 250,
+  "containsSecret": "fixture-token-must-never-appear"
+}
