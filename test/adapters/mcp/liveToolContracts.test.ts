@@ -5,6 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerAnnotate } from '../../../src/adapters/inbound/mcp/tools/annotateThesis.js';
 import { registerGetChartContext } from '../../../src/adapters/inbound/mcp/tools/getChartContext.js';
 import { registerListPanes } from '../../../src/adapters/inbound/mcp/tools/listPanes.js';
+import { registerCaptureSnapshot } from '../../../src/adapters/inbound/mcp/tools/captureSnapshot.js';
 import type { AnnotateThesisUseCase } from '../../../src/application/use-cases/annotateThesis.js';
 import type { ChartPort } from '../../../src/application/ports/chart.js';
 import { createAnalysisId } from '../../../src/domain/analysis/model.js';
@@ -71,6 +72,7 @@ describe('live hex MCP output contracts', () => {
     };
     registerGetChartContext(server, chartPort);
     registerListPanes(server, chartPort);
+    registerCaptureSnapshot(server, chartPort);
     registerAnnotate(server, {
       execute: async () => ({
         artifact,
@@ -135,6 +137,35 @@ describe('live hex MCP output contracts', () => {
     });
   });
 
+  it('gates snapshots and returns image once with compact integrity metadata', async () => {
+    const gated = await client.callTool({
+      name: 'romaco_capture_snapshot',
+      arguments: { format: 'jpeg' },
+    });
+    expect(gated.structuredContent).toMatchObject({
+      status: 'error',
+      error: { code: 'ACK_REQUIRED' },
+    });
+
+    const result = await client.callTool({
+      name: 'romaco_capture_snapshot',
+      arguments: { format: 'jpeg', acknowledgeHighTokenCost: true },
+    });
+    expect(result.structuredContent).toMatchObject({
+      status: 'ok',
+      data: {
+        format: 'jpeg',
+        mimeType: 'image/jpeg',
+        byteLength: 4,
+        sha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+      },
+      context: { chartId: 'chart_aapl' },
+    });
+    const images = result.content.filter((block) => block.type === 'image');
+    expect(images).toHaveLength(1);
+    expect(JSON.stringify(result.structuredContent)).not.toContain('ZmFrZQ==');
+  });
+
   it('returns analysis/chart/resource identities for an atomic annotation', async () => {
     const challenge = await client.callTool({
       name: 'romaco_annotate',
@@ -176,7 +207,12 @@ describe('live hex MCP output contracts', () => {
 
   it('advertises strict output schemas for all migrated live tools', async () => {
     const tools = await client.listTools();
-    for (const name of ['romaco_get_chart_context', 'romaco_list_panes', 'romaco_annotate']) {
+    for (const name of [
+      'romaco_get_chart_context',
+      'romaco_list_panes',
+      'romaco_capture_snapshot',
+      'romaco_annotate',
+    ]) {
       expect(tools.tools.find((tool) => tool.name === name)?.outputSchema).toMatchObject({
         type: 'object',
         additionalProperties: false,

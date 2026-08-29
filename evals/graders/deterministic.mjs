@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 function structured(call) {
   return call?.result?.structuredContent ?? call?.structuredContent;
 }
@@ -272,6 +274,7 @@ const ALLOWED_TOOLS = {
   H03_missing_session_recovery: new Set(['romaco_thesis', 'romaco_setup_chart']),
   H04_pattern_cost_gate: new Set(['romaco_setup_chart', 'romaco_detect_patterns']),
   L02_context_cost_gate: new Set(['romaco_get_chart_context']),
+  L08_snapshot_gate: new Set(['romaco_capture_snapshot']),
 };
 
 function toolPolicyGrader(task, trial) {
@@ -295,6 +298,30 @@ function toolPolicyGrader(task, trial) {
       || !fullHasAnchors
     ) {
       return fail('pattern cost gate leaked anchors or changed artifact identity');
+    }
+  }
+  if (task.id === 'L08_snapshot_gate') {
+    const gate = structured(trial.facts.gated);
+    const captured = trial.facts.captured;
+    const data = captured.structuredContent.data;
+    const images = captured.content.filter((block) => block.type === 'image');
+    const texts = captured.content.filter((block) => block.type === 'text');
+    const bytes = images.length === 1 ? Buffer.from(images[0].data, 'base64') : Buffer.alloc(0);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    const leaked = texts.some((block) => block.text?.includes(images[0]?.data ?? '__missing__'))
+      || JSON.stringify(captured.structuredContent).includes(images[0]?.data ?? '__missing__');
+    if (
+      gate.error?.code !== 'ACK_REQUIRED'
+      || trial.facts.afterGate !== trial.facts.beforeCaptures
+      || trial.facts.afterCapture !== trial.facts.beforeCaptures + 1
+      || images.length !== 1
+      || data.format !== 'jpeg'
+      || data.mimeType !== 'image/jpeg'
+      || data.byteLength !== bytes.byteLength
+      || data.sha256 !== digest
+      || leaked
+    ) {
+      return fail('snapshot gate, image integrity, or compact output invariant failed');
     }
   }
   return pass('only allowed capabilities and payload gates were used');

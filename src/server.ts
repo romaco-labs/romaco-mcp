@@ -69,7 +69,7 @@ export function createServer(
   registerRemoveAlert(server);
   registerClearAlerts(server);
   registerRemoveIndicator(server);
-  registerCaptureSnapshot(server);
+  registerCaptureSnapshot(server, runtime.chart, contractOptions);
   registerOpenPaperPosition(server);
   registerClearDrawings(server);
 

@@ -244,6 +244,13 @@ export const listPanesDataSchema = z.object({
   panes: z.array(z.record(z.unknown())),
 }).strict();
 
+export const snapshotDataSchema = z.object({
+  format: z.enum(['png', 'jpeg']),
+  mimeType: z.enum(['image/png', 'image/jpeg']),
+  byteLength: z.number().int().nonnegative(),
+  sha256: z.string().regex(/^[0-9a-f]{64}$/),
+}).strict();
+
 export const annotateDataSchema = z.object({
   analysisId: z.string().min(1),
   datasetId: z.string().min(1),

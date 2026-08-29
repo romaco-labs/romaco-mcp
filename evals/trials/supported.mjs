@@ -354,6 +354,24 @@ async function l07() {
   });
 }
 
+async function l08() {
+  const candles = realCandles('AAPL').slice(-120);
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness, chart }) => {
+      const beforeCaptures = chart.calls.filter((call) => call.operation === 'captureSnapshot').length;
+      const gated = await harness.callTool('romaco_capture_snapshot', { format: 'jpeg' });
+      const afterGate = chart.calls.filter((call) => call.operation === 'captureSnapshot').length;
+      const captured = await harness.callTool('romaco_capture_snapshot', {
+        format: 'jpeg',
+        acknowledgeHighTokenCost: true,
+      });
+      const afterCapture = chart.calls.filter((call) => call.operation === 'captureSnapshot').length;
+      return { gated, captured, beforeCaptures, afterGate, afterCapture };
+    },
+  });
+}
+
 async function a01() {
   const candles = realCandles('AAPL');
   return runWithHarness({
@@ -489,6 +507,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['group-preserves-user-state', s04],
   ['cross-symbol-hard-stop', l06],
   ['pattern-group-replace', l07],
+  ['snapshot-gate', l08],
   ['explicit-dataset-race', s05],
   ['annotate-approval', a01],
   ['atomic-disconnect-recovery', d02],
