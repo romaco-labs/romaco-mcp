@@ -35,18 +35,34 @@ export const tradeThesisSchema = z.object({
   notes: z.array(z.string()),
 }).strict();
 
-const patternPointSchema = z.object({
+export const patternPointSchema = z.object({
   ts: z.number(),
   price: z.number(),
   role: z.string(),
 }).strict();
 
-const patternSchema = z.object({
+export const patternSchema = z.object({
   kind: z.enum(PATTERN_KINDS),
   confidence: z.number(),
   points: z.array(patternPointSchema),
   target_price: z.number().optional(),
   invalidation_price: z.number().optional(),
+}).strict();
+
+export const trimmedPatternSchema = z.object({
+  kind: z.enum(PATTERN_KINDS),
+  confidence: z.number(),
+  target_price: z.number().optional(),
+  invalidation_price: z.number().optional(),
+  anchor_count: z.number().int().nonnegative(),
+}).strict();
+
+export const detectPatternsDataSchema = z.object({
+  analysisId: z.string().min(1),
+  datasetId: z.string().min(1),
+  format: z.enum(['concise', 'full']),
+  count: z.number().int().nonnegative(),
+  patterns: z.array(z.union([trimmedPatternSchema, patternSchema])),
 }).strict();
 
 const levelDetailSchema = z.object({

@@ -39,11 +39,10 @@
     "id": "H04_pattern_cost_gate",
     "split": "dev",
     "category": "headless",
-    "status": "planned",
-    "plannedReason": "romaco_detect_patterns still lacks a strict structuredContent adapter, so its public result cannot pass the contract grader.",
+    "status": "runnable",
     "prompt": "Detect patterns in AAPL. Start concise; only return exact anchor coordinates after the user explicitly asks for them.",
     "oracleWorkflow": "pattern-cost-gate",
-    "fixtureRefs": ["real-aapl"],
+    "fixtureRefs": ["head-shoulders-market"],
     "graderRefs": ["contract", "tool-policy", "budget"],
     "expectedOutcomes": ["default output omits points", "acknowledged output may include points", "payload budget remains enforced"],
     "budget": { "maxToolCalls": 4, "maxResultBytes": 18000, "maxDurationMs": 3000 }

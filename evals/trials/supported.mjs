@@ -166,6 +166,23 @@ async function h03() {
   });
 }
 
+async function h04() {
+  const candles = headShouldersCandles();
+  return runWithHarness({
+    chart: disconnectedChart('AAPL', '1h'),
+    execute: async ({ harness }) => {
+      const setup = await harness.callTool('romaco_setup_chart', {
+        symbol: 'AAPL', preset: 'clean', timeframe: '1h', source: 'raw', rawCandles: candles,
+      });
+      const concise = await harness.callTool('romaco_detect_patterns');
+      const full = await harness.callTool('romaco_detect_patterns', {
+        acknowledgeHighTokenCost: true,
+      });
+      return { setup, concise, full };
+    },
+  });
+}
+
 async function h05() {
   const candles = flatCandles();
   return runWithHarness({
@@ -463,6 +480,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['raw-load-analyze', h01],
   ['headless-setup', h02],
   ['missing-session-recovery', h03],
+  ['pattern-cost-gate', h04],
   ['flat-stand-aside', h05],
   ['invalid-target-recovery', h08],
   ['live-setup-identity', l01],

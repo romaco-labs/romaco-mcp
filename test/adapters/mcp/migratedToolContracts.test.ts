@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createTestClient } from '../../tools/_client.js';
 import { session } from '../../../src/session.js';
+import { headShouldersCandles } from '../../compression/fixtures.js';
 
 function rawCandles(count = 100) {
   return Array.from({ length: count }, (_, index) => ({
@@ -121,6 +122,36 @@ describe('hex-migrated MCP output contracts', () => {
     });
   });
 
+  it('gates exact pattern anchors while preserving one analysis artifact', async () => {
+    await harness.callTool('romaco_load_candles', {
+      source: 'raw',
+      symbol: 'AAPL',
+      timeframe: '1h',
+      rawCandles: headShouldersCandles(),
+    });
+    const concise = await harness.callTool('romaco_detect_patterns');
+    const full = await harness.callTool('romaco_detect_patterns', {
+      acknowledgeHighTokenCost: true,
+    });
+    const conciseData = (concise.raw.structuredContent as any).data;
+    const fullData = (full.raw.structuredContent as any).data;
+
+    expect(conciseData).toMatchObject({
+      format: 'concise',
+      count: expect.any(Number),
+      datasetId: expect.stringMatching(/^dataset_/),
+      analysisId: expect.stringMatching(/^analysis_/),
+    });
+    expect(fullData).toMatchObject({
+      format: 'full',
+      count: conciseData.count,
+      datasetId: conciseData.datasetId,
+      analysisId: conciseData.analysisId,
+    });
+    expect(conciseData.patterns.every((pattern: any) => pattern.points === undefined)).toBe(true);
+    expect(fullData.patterns.every((pattern: any) => Array.isArray(pattern.points))).toBe(true);
+  });
+
   it('retrieves an exact prior thesis by public analysisId without changing current state', async () => {
     await harness.callTool('romaco_load_candles', {
       source: 'raw', symbol: 'AAPL', timeframe: '1h', rawCandles: rawCandles(120),
@@ -173,6 +204,7 @@ describe('hex-migrated MCP output contracts', () => {
       'romaco_load_candles',
       'romaco_setup_chart',
       'romaco_thesis',
+      'romaco_detect_patterns',
     ]) {
       expect(tools.tools.find((tool) => tool.name === name)?.outputSchema).toMatchObject({
         type: 'object',

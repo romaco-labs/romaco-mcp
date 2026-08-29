@@ -270,6 +270,7 @@ function traceGrader(_task, trial) {
 
 const ALLOWED_TOOLS = {
   H03_missing_session_recovery: new Set(['romaco_thesis', 'romaco_setup_chart']),
+  H04_pattern_cost_gate: new Set(['romaco_setup_chart', 'romaco_detect_patterns']),
   L02_context_cost_gate: new Set(['romaco_get_chart_context']),
 };
 
@@ -277,7 +278,26 @@ function toolPolicyGrader(task, trial) {
   const allowed = ALLOWED_TOOLS[task.id];
   if (!allowed) return pass('task has no additional tool restriction');
   const invalid = trial.calls.find((call) => !allowed.has(call.name));
-  return invalid ? fail(`unexpected tool ${invalid.name}`) : pass('only allowed capabilities were used');
+  if (invalid) return fail(`unexpected tool ${invalid.name}`);
+  if (task.id === 'H04_pattern_cost_gate') {
+    const concise = structured(trial.facts.concise).data;
+    const full = structured(trial.facts.full).data;
+    const conciseLeaksPoints = concise.patterns.some((pattern) => 'points' in pattern);
+    const fullHasAnchors = full.patterns.length > 0
+      && full.patterns.every((pattern) => Array.isArray(pattern.points) && pattern.points.length > 0);
+    if (
+      concise.format !== 'concise'
+      || full.format !== 'full'
+      || concise.count !== full.count
+      || concise.analysisId !== full.analysisId
+      || concise.datasetId !== full.datasetId
+      || conciseLeaksPoints
+      || !fullHasAnchors
+    ) {
+      return fail('pattern cost gate leaked anchors or changed artifact identity');
+    }
+  }
+  return pass('only allowed capabilities and payload gates were used');
 }
 
 function evidenceConformanceGrader(_task, trial) {

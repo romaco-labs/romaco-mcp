@@ -103,7 +103,7 @@ export function createServer(
   );
   registerDrawPattern(server, runtime.chart);
   registerFindLevels(server);
-  registerDetectPatterns(server);
+  registerDetectPatterns(server, runtime.resolveThesis, contractOptions);
   registerCalculatePositionSize(server, undefined, contractOptions);
 
   return server;
