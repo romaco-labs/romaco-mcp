@@ -75,4 +75,39 @@ describe('LoadDatasetUseCase', () => {
     expect(await analyses.getActive()).toBe(activeAnalysis);
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it('loads a detached candidate without changing prior active state or projection', async () => {
+    let datasetNumber = 0;
+    const datasets = new InMemoryDatasetRepository(() => String(++datasetNumber));
+    const analyses = new InMemoryAnalysisRepository(() => 'old');
+    const activeDataset = await datasets.save({
+      source: 'raw', symbol: 'OLD', timeframe: '1d', candles, fetchedAt: 1,
+    });
+    await datasets.setActive(activeDataset.datasetId);
+    const activeAnalysis = await analyses.save({
+      datasetId: activeDataset.datasetId,
+      provider: 'local',
+      summary: {} as MarketSummary,
+      thesis: {} as TradeThesis,
+      schemaVersion: '1',
+      createdAt: 1,
+    });
+    await analyses.setActive(activeAnalysis.analysisId);
+    const replace = vi.fn();
+    const useCase = new LoadDatasetUseCase({
+      load: vi.fn(async () => ({
+        source: 'yfinance', symbol: 'AAPL', timeframe: '1d', candles, fetchedAt: 2,
+      })),
+    }, datasets, analyses, { replace });
+
+    const candidate = await useCase.loadDetached({
+      source: 'yfinance', symbol: 'AAPL', timeframe: '1d',
+    });
+
+    expect(candidate.symbol).toBe('AAPL');
+    expect(candidate.datasetId).not.toBe(activeDataset.datasetId);
+    expect(await datasets.getActive()).toBe(activeDataset);
+    expect(await analyses.getActive()).toBe(activeAnalysis);
+    expect(replace).not.toHaveBeenCalled();
+  });
 });

@@ -12,14 +12,19 @@ export class LoadDatasetUseCase {
     private readonly activeProjection: ActiveDatasetProjection,
   ) {}
 
-  async execute(request: LoadMarketDataRequest): Promise<DatasetRecord> {
+  /** Load and persist without publishing process-global active state. */
+  async loadDetached(request: LoadMarketDataRequest): Promise<DatasetRecord> {
     const symbol = normalizeSymbol(request.symbol);
     const loaded = await this.marketData.load({ ...request, symbol });
-    const record = await this.datasets.save({
+    return this.datasets.save({
       ...loaded,
       symbol,
       timeframe: request.timeframe,
     });
+  }
+
+  async execute(request: LoadMarketDataRequest): Promise<DatasetRecord> {
+    const record = await this.loadDetached(request);
 
     // Publish active state only after loading and persistence both succeed.
     await this.datasets.setActive(record.datasetId);

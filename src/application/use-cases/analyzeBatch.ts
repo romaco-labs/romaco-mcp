@@ -46,7 +46,7 @@ export class AnalyzeBatchUseCase {
     const failures: AnalyzeBatchFailure[] = [];
     for (const symbol of symbols) {
       try {
-        const dataset = await this.loadDataset.execute({
+        const dataset = await this.loadDataset.loadDetached({
           source: 'yfinance',
           symbol,
           timeframe: request.timeframe,

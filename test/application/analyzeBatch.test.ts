@@ -51,7 +51,7 @@ describe('AnalyzeBatchUseCase', () => {
     const replace = vi.fn();
     const useCase = new AnalyzeBatchUseCase(
       {
-        execute: vi.fn(async ({ symbol }: { symbol: string }) => {
+        loadDetached: vi.fn(async ({ symbol }: { symbol: string }) => {
           if (symbol === 'MISSING') throw new Error('unavailable');
           return datasets.get(symbol)!;
         }),
@@ -75,13 +75,13 @@ describe('AnalyzeBatchUseCase', () => {
     expect(replace).toHaveBeenCalledWith(dataset('SPY'));
   });
 
-  it('fails when no symbol can be loaded and does not publish active state', async () => {
+  it('preserves prior active state when detached load succeeds but analysis fails', async () => {
     const setActiveDataset = vi.fn();
     const setActiveAnalysis = vi.fn();
     const replace = vi.fn();
     const useCase = new AnalyzeBatchUseCase(
-      { execute: vi.fn(async () => { throw new Error('down'); }) } as never,
-      { resolveForDataset: vi.fn() } as never,
+      { loadDetached: vi.fn(async () => dataset('AAPL')) } as never,
+      { resolveForDataset: vi.fn(async () => { throw new Error('analysis failed'); }) } as never,
       { setActive: setActiveDataset } as never,
       { setActive: setActiveAnalysis } as never,
       { replace },
