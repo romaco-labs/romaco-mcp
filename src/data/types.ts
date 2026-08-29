@@ -1,4 +1,5 @@
 import type { Candle } from '../compression/types.js';
+import type { DatasetId } from '../domain/dataset/model.js';
 
 export type DataSourceName = 'yfinance' | 'raw';
 
@@ -19,6 +20,7 @@ export interface LoadRequest {
 }
 
 export interface LoadResponse {
+  datasetId?: DatasetId;
   source: DataSourceName;
   symbol: string;
   timeframe: Timeframe;

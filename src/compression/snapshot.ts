@@ -9,11 +9,21 @@ import type { Candle, PatternHit } from './types.js';
 // ──────────────────────────────────────────────────────────────────────────
 
 interface ChartContextLike {
+  identity?: { chartId?: string; symbol?: string; timeframe?: string };
+  raw?: unknown;
+  chartId?: string;
+  symbol?: string;
+  resolution?: string;
   visibleRange?: { startTimestamp?: number; endTimestamp?: number; startIndex?: number; endIndex?: number };
   visibleCandles?: unknown[];
   existingDrawings?: Array<{ id?: string; type?: string; label?: string }>;
   existingIndicators?: Array<{ id?: string; name?: string; params?: unknown[]; visible?: boolean }>;
-  panels?: Array<{ id?: string; alias?: string; indicators?: Array<{ name?: string; id?: string }> }>;
+  panels?: Array<{
+    id?: string;
+    alias?: string;
+    indicatorIds?: string[];
+    indicators?: Array<{ name?: string; id?: string }>;
+  }>;
   chartDimensions?: { width?: number; height?: number };
   currentPrice?: number;
   totalCandles?: number;
@@ -27,6 +37,7 @@ interface ChartContextLike {
 }
 
 export interface CompressedChartContext {
+  identity: { chartId: string | null; symbol: string | null; timeframe: string | null };
   lastPrice: number | null;
   totalCandles: number;
   visibleRange: { startIndex: number; endIndex: number; startTimestamp: number | null; endTimestamp: number | null };
@@ -43,12 +54,30 @@ export interface CompressedChartContext {
 }
 
 export function compressChartContext(ctx: unknown): CompressedChartContext {
-  const c = (ctx ?? {}) as ChartContextLike;
-  const panes = (c.panels ?? []).map((p) => ({
+  const wrapper = (ctx ?? {}) as ChartContextLike;
+  const c = ((wrapper.raw && typeof wrapper.raw === 'object') ? wrapper.raw : wrapper) as ChartContextLike;
+  const indicators = c.existingIndicators ?? [];
+  const indicatorsById = new Map(
+    indicators
+      .filter((indicator) => typeof indicator.id === 'string')
+      .map((indicator) => [indicator.id as string, indicator]),
+  );
+  const subpanelIds = new Set<string>();
+  const panes = (c.panels ?? []).map((p) => {
+    const names = p.indicatorIds
+      ? p.indicatorIds
+          .map((id) => {
+            subpanelIds.add(id);
+            return indicatorsById.get(id)?.name ?? '';
+          })
+          .filter(Boolean)
+      : (p.indicators ?? []).map((indicator) => indicator.name ?? '').filter(Boolean);
+    return {
     id: p.id ?? '',
-    alias: p.alias ?? '',
-    indicatorNames: (p.indicators ?? []).map((i) => i.name ?? '').filter(Boolean),
-  }));
+      alias: p.alias ?? names[0]?.toLowerCase() ?? '',
+      indicatorNames: names,
+    };
+  });
   // Always include the main pane explicitly with its indicator names
   // (panels[] from the bridge sometimes only enumerates subpanels).
   const hasMain = panes.some((p) => p.id === 'main' || p.alias === 'main');
@@ -56,13 +85,18 @@ export function compressChartContext(ctx: unknown): CompressedChartContext {
     panes.unshift({
       id: 'main',
       alias: 'main',
-      indicatorNames: (c.existingIndicators ?? [])
-        .filter((i) => i.visible !== false)
-        .map((i) => i.name ?? '')
+      indicatorNames: indicators
+        .filter((indicator) => indicator.visible !== false && !subpanelIds.has(indicator.id ?? ''))
+        .map((indicator) => indicator.name ?? '')
         .filter(Boolean),
     });
   }
   return {
+    identity: {
+      chartId: wrapper.identity?.chartId ?? wrapper.chartId ?? null,
+      symbol: wrapper.identity?.symbol ?? c.symbol ?? null,
+      timeframe: wrapper.identity?.timeframe ?? c.resolution ?? null,
+    },
     lastPrice: typeof c.currentPrice === 'number' ? c.currentPrice : null,
     totalCandles: c.totalCandles ?? 0,
     visibleRange: {

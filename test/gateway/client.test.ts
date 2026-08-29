@@ -65,6 +65,20 @@ describe('gatewayApiUrl', () => {
     process.env.ROMACO_API_URL = 'https://api.romaco.tech///';
     expect(gatewayApiUrl()).toBe('https://api.romaco.tech');
   });
+
+  it('rejects non-HTTPS remote endpoints and embedded credentials', () => {
+    process.env.ROMACO_API_URL = 'http://api.romaco.tech';
+    expect(() => gatewayApiUrl()).toThrow(/HTTPS/i);
+    process.env.ROMACO_API_URL = 'https://user:secret@api.romaco.tech';
+    expect(() => gatewayApiUrl()).toThrow(/credentials/i);
+  });
+
+  it('allows HTTP only for loopback development endpoints', () => {
+    for (const url of ['http://localhost:8000', 'http://127.0.0.1:8000', 'http://[::1]:8000']) {
+      process.env.ROMACO_API_URL = url;
+      expect(gatewayApiUrl()).toBe(url);
+    }
+  });
 });
 
 describe('callGateway', () => {
@@ -100,6 +114,18 @@ describe('callGateway', () => {
 
     const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.romaco.tech/gateway/levels');
+  });
+
+  it('rejects insecure remote URL before fetch and never exposes token/body in logs', async () => {
+    process.env.ROMACO_TOKEN = 'super-secret-token';
+    process.env.ROMACO_API_URL = 'http://api.romaco.tech';
+    const fetchMock = vi.fn();
+    const consoleMock = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callGateway('/gateway/thesis', { private: 'candle-body' })).rejects.toThrow(/HTTPS/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(consoleMock).not.toHaveBeenCalled();
   });
 
   it('401 → GatewayError(status=401), flagged as auth error', async () => {

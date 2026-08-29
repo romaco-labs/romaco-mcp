@@ -28,3 +28,9 @@ export function createDatasetId(value: string): DatasetId {
   if (!normalized) throw new Error('DatasetId cannot be empty.');
   return normalized as DatasetId;
 }
+
+export function normalizeSymbol(value: string): string {
+  const normalized = value.trim().toUpperCase();
+  if (!normalized) throw new Error('Symbol cannot be empty.');
+  return normalized;
+}

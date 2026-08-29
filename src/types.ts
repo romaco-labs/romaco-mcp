@@ -21,25 +21,35 @@ export interface McpDrawingPoint {
   price: number;
 }
 
+export interface BridgeAddDrawingAction {
+  action: 'addDrawing';
+  drawingType: string;
+  points: McpDrawingPoint[];
+  label?: string;
+  style?: McpDrawingStyle;
+  paneId?: string;
+  groupId?: string;
+}
+
+export type BridgeAgentDrawingInput = Omit<BridgeAddDrawingAction, 'action' | 'groupId'>;
+
 // Subset of ChartAction shapes the MCP server constructs and sends to the
 // browser. The browser executes them via ChartAgentController.executeAction().
 export type BridgeAction =
   | { action: 'addIndicator'; indicatorType: string; params?: number[] }
-  | {
-      action: 'addDrawing';
-      drawingType: string;
-      points: McpDrawingPoint[];
-      label?: string;
-      style?: McpDrawingStyle;
-      paneId?: string;
-      groupId?: string;
-    }
+  | BridgeAddDrawingAction
   | { action: 'zoomIn'; factor?: number }
   | { action: 'zoomOut'; factor?: number }
   | { action: 'resetView' }
   | { action: 'addAlert'; price: number; options?: { direction?: 'above' | 'below' | 'cross'; note?: string } }
   | { action: 'clearDrawings' }
   | { action: 'removeDrawingsByGroup'; groupId: string }
+  | {
+      action: 'replaceAgentDrawingGroup';
+      groupId: string;
+      idempotencyKey: string;
+      drawings: BridgeAgentDrawingInput[];
+    }
   | { action: 'openPaperLong'; quantity: number; stopLoss?: number; takeProfit?: number }
   | { action: 'openPaperShort'; quantity: number; stopLoss?: number; takeProfit?: number }
   | { action: 'getIndicatorValues'; indicatorId?: string; indicatorName?: string }

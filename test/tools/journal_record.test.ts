@@ -53,4 +53,32 @@ describe('mutating tools record into the chartState journal', () => {
       await close();
     }
   });
+
+  it('records browser resource ids for exact later removal', async () => {
+    vi.mocked(bridge.executeAction)
+      .mockResolvedValueOnce({ success: true, data: { indicatorId: 'ema-20' } })
+      .mockResolvedValueOnce({ success: true, data: { alert: { id: 'alert-1' } } });
+    const { callTool, close } = await createTestClient();
+    try {
+      await callTool('romaco_add_indicator', { indicatorType: 'EMA', params: [20] });
+      await callTool('romaco_add_alert', { price: 100, direction: 'above' });
+
+      expect(chartState.snapshot().indicators[0].resourceId).toBe('ema-20');
+      expect(chartState.snapshot().alerts[0].resourceId).toBe('alert-1');
+    } finally {
+      await close();
+    }
+  });
+
+  it('list_panes maps ActionResult failure to MCP isError', async () => {
+    vi.mocked(bridge.executeAction).mockResolvedValueOnce({ success: false, error: 'Chart not ready' });
+    const { callTool, close } = await createTestClient();
+    try {
+      const result = await callTool('romaco_list_panes', {});
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(/Chart not ready/i);
+    } finally {
+      await close();
+    }
+  });
 });

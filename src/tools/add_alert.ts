@@ -35,6 +35,7 @@ export function registerAddAlert(server: McpServer): void {
         chartState.recordAlert(
           { action: 'addAlert', price, options: { direction, note } },
           session.getLastLoad()?.symbol ?? null,
+          (result.data as { alert?: { id?: string } } | undefined)?.alert?.id,
         );
         return {
           content: [

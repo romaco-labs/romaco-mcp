@@ -16,7 +16,7 @@ import { registerLoadCandles } from './tools/load_candles.js';
 import { registerAnalyzeMarket } from './tools/analyze_market.js';
 import { registerThesis } from './tools/thesis.js';
 import { registerThesisBatch } from './tools/thesis_batch.js';
-import { registerAnnotate } from './tools/annotate.js';
+import { registerAnnotate } from './adapters/inbound/mcp/tools/annotateThesis.js';
 import { registerDrawPattern } from './tools/draw_pattern.js';
 import { registerFindLevels } from './tools/find_levels.js';
 import { registerDetectPatterns } from './tools/detect_patterns.js';
@@ -26,6 +26,7 @@ import { registerListTemplates } from './tools/list_templates.js';
 import { registerListPanes } from './tools/list_panes.js';
 import { registerGetIndicatorValues } from './tools/get_indicator_values.js';
 import { registerGoToTimestamp } from './tools/go_to_timestamp.js';
+import { createProductionRuntime, type ApplicationRuntime } from './bootstrap/runtime.js';
 
 // Versión SIEMPRE desde package.json — la 0.0.2 hardcodeada quedó
 // desincronizada del paquete publicado (0.0.3) y serverInfo mentía.
@@ -33,14 +34,14 @@ const { version: PKG_VERSION } = createRequire(import.meta.url)('../package.json
   version: string;
 };
 
-export function createServer(): McpServer {
+export function createServer(runtime: ApplicationRuntime = createProductionRuntime()): McpServer {
   const server = new McpServer({
     name: 'romaco',
     version: PKG_VERSION,
   });
 
   // Browser-bridge tools (require <McpBridge /> in user's app)
-  registerGetChartContext(server);
+  registerGetChartContext(server, runtime.chart);
   registerGetVisibleCandles(server);
   registerAddIndicator(server);
   registerAddDrawing(server);
@@ -54,19 +55,19 @@ export function createServer(): McpServer {
   registerClearDrawings(server);
 
   // Living Annotations — Phase 0 unlock
-  registerListPanes(server);
+  registerListPanes(server, runtime.chart);
   registerGetIndicatorValues(server);
   registerGoToTimestamp(server);
 
   // Headless data + analysis tools (no browser required)
   registerListTemplates(server);
-  registerSetupChart(server);          // one-command setup: load + preset + analyze
-  registerLoadCandles(server);
+  registerSetupChart(server, runtime.setupChart, runtime.presetNames);
+  registerLoadCandles(server, runtime.loadDataset);
   registerAnalyzeMarket(server);
-  registerThesis(server);
+  registerThesis(server, runtime.resolveThesis);
   registerThesisBatch(server);         // multi-symbol ranked analysis
-  registerAnnotate(server);            // draws the thesis on the chart (needs <McpBridge />)
-  registerDrawPattern(server);         // draws detected pattern geometry (needs <McpBridge />)
+  registerAnnotate(server, runtime.annotateThesis);
+  registerDrawPattern(server, runtime.chart);
   registerFindLevels(server);
   registerDetectPatterns(server);
   registerCalculatePositionSize(server);

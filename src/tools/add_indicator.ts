@@ -29,6 +29,7 @@ export function registerAddIndicator(server: McpServer): void {
         chartState.recordIndicator(
           { action: 'addIndicator', indicatorType, params },
           session.getLastLoad()?.symbol ?? null,
+          (result.data as { indicatorId?: string } | undefined)?.indicatorId,
         );
         const label = params ? `${indicatorType}(${params.join(', ')})` : indicatorType;
         return { content: [{ type: 'text' as const, text: `${label} added to chart` }] };

@@ -28,32 +28,32 @@ export function patternGroupId(kind: PatternKind): string {
   switch (kind) {
     case 'head_shoulders':
     case 'inverse_head_shoulders':
-      return 'romaco-pattern-hs';
+      return 'romaco-mcp/pattern/hs';
     case 'double_top':
     case 'double_bottom':
     case 'triple_top':
     case 'triple_bottom':
-      return 'romaco-pattern-double';
+      return 'romaco-mcp/pattern/double';
     case 'ascending_triangle':
     case 'descending_triangle':
     case 'symmetric_triangle':
-      return 'romaco-pattern-triangle';
+      return 'romaco-mcp/pattern/triangle';
     case 'bull_flag':
     case 'bear_flag':
-      return 'romaco-pattern-flag';
+      return 'romaco-mcp/pattern/flag';
     case 'channel_up':
     case 'channel_down':
     case 'channel_flat':
-      return 'romaco-pattern-channel';
+      return 'romaco-mcp/pattern/channel';
     case 'rising_wedge':
     case 'falling_wedge':
-      return 'romaco-pattern-wedge';
+      return 'romaco-mcp/pattern/wedge';
     case 'cup_handle':
     case 'rounding_bottom':
-      return 'romaco-pattern-cup';
+      return 'romaco-mcp/pattern/cup';
     case 'gap_up':
     case 'gap_down':
-      return 'romaco-pattern-gap';
+      return 'romaco-mcp/pattern/gap';
     case 'abcd_bullish':
     case 'abcd_bearish':
     case 'gartley_bullish':
@@ -64,7 +64,7 @@ export function patternGroupId(kind: PatternKind): string {
     case 'butterfly_bearish':
     case 'crab_bullish':
     case 'crab_bearish':
-      return 'romaco-pattern-harmonic';
+      return 'romaco-mcp/pattern/harmonic';
   }
 }
 

@@ -117,6 +117,25 @@ describe('reconcileChartState', () => {
     expect(exec).toHaveBeenCalledTimes(2);
   });
 
+  it('treats ActionResult.success=false as failure and continues replay', async () => {
+    chartState.recordIndicator(EMA20, 'AAPL');
+    chartState.recordIndicator({ action: 'addIndicator', indicatorType: 'RSI', params: [14] }, 'AAPL');
+    loadSymbol('AAPL');
+    ctx({ existingIndicators: [], existingDrawings: [], alerts: [] });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const exec = vi.spyOn(bridge, 'executeAction')
+      .mockResolvedValueOnce({ success: false, error: 'host denied' })
+      .mockResolvedValueOnce({ success: true, data: { indicatorId: 'rsi-14' } });
+
+    await reconcileChartState();
+
+    expect(exec).toHaveBeenCalledTimes(2);
+    expect(consoleError).toHaveBeenCalledWith(expect.stringMatching(/host denied/));
+    expect(chartState.snapshot().indicators.find((entry) =>
+      (entry.action as { indicatorType?: string }).indicatorType === 'RSI'
+    )?.resourceId).toBe('rsi-14');
+  });
+
   it('getContext failure on every attempt → returns without throwing, applies nothing', async () => {
     chartState.recordIndicator(EMA20, 'AAPL');
     loadSymbol('AAPL');

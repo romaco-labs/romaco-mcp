@@ -82,3 +82,21 @@ export interface ChartSnapshot {
   format: 'png' | 'jpeg';
   dataUrl: string;
 }
+
+export function normalizeOptionalChartSymbol(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim().toUpperCase();
+  return normalized || undefined;
+}
+
+const TIMEFRAMES: ReadonlySet<string> = new Set([
+  '1m', '2m', '5m', '15m', '30m',
+  '1h', '2h', '4h',
+  '1d', '5d', '1w', '1mo', '3mo',
+]);
+
+export function parseChartTimeframe(value: unknown): Timeframe | undefined {
+  return typeof value === 'string' && TIMEFRAMES.has(value)
+    ? value as Timeframe
+    : undefined;
+}

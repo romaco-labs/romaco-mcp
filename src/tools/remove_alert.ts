@@ -41,7 +41,7 @@ export function registerRemoveAlert(server: McpServer): void {
         alertId: alert.id,
       });
       if (result.success) {
-        chartState.removeAlert(price, alert.direction ?? direction ?? 'cross');
+        chartState.removeAlert(alert.id, price, alert.direction ?? direction ?? 'cross');
         return {
           content: [{ type: 'text' as const, text: `Alert at ${price} removed.` }],
         };

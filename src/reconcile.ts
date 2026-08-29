@@ -83,7 +83,17 @@ function hasAlert(existing: ContextAlert[], want: Extract<BridgeAction, { action
 /** Best-effort apply: one failed overlay must not abort the rest of the replay. */
 async function tryApply(action: BridgeAction): Promise<void> {
   try {
-    await bridge.executeAction(action);
+    const result = await bridge.executeAction(action);
+    if (!result.success) {
+      throw new Error(result.error ?? 'chart rejected action');
+    }
+    const data = result.data as Record<string, unknown> | undefined;
+    const alert = data?.alert as Record<string, unknown> | undefined;
+    const resourceId =
+      (typeof data?.indicatorId === 'string' ? data.indicatorId : undefined)
+      ?? (typeof data?.drawingId === 'string' ? data.drawingId : undefined)
+      ?? (typeof alert?.id === 'string' ? alert.id : undefined);
+    if (resourceId) chartState.bindResourceId(action, resourceId);
   } catch (err) {
     console.error(`[romaco-mcp] reconcile: failed to re-apply ${action.action}: ${err instanceof Error ? err.message : String(err)}`);
   }

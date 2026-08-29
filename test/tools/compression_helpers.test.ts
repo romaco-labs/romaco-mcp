@@ -50,6 +50,29 @@ describe('compressChartContext', () => {
     expect(r.panes[0].indicatorNames).toContain('EMA');
   });
 
+  it('maps actual chart panel indicatorIds and preserves canonical identity', () => {
+    const context = {
+      identity: { chartId: 'primary', symbol: 'AAPL', timeframe: '1h' },
+      raw: {
+        symbol: 'AAPL',
+        resolution: '1h',
+        existingIndicators: [
+          { id: 'ema-20', name: 'EMA', visible: true },
+          { id: 'rsi-14', name: 'RSI', visible: true },
+        ],
+        panels: [{ id: 'panel-rsi', indicatorIds: ['rsi-14'] }],
+      },
+    };
+
+    const result = compressChartContext(context);
+
+    expect(result.identity).toEqual({ chartId: 'primary', symbol: 'AAPL', timeframe: '1h' });
+    expect(result.panes).toEqual([
+      { id: 'main', alias: 'main', indicatorNames: ['EMA'] },
+      { id: 'panel-rsi', alias: 'rsi', indicatorNames: ['RSI'] },
+    ]);
+  });
+
   it('handles empty / undefined input gracefully', () => {
     expect(() => compressChartContext({})).not.toThrow();
     expect(() => compressChartContext(null)).not.toThrow();

@@ -21,7 +21,23 @@ export function isPro(): boolean {
 
 /** Base URL of the ROA-I backend, without a trailing slash. */
 export function gatewayApiUrl(): string {
-  return (process.env.ROMACO_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
+  const raw = (process.env.ROMACO_API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new GatewayError('ROMACO_API_URL must be a valid absolute URL.');
+  }
+  if (url.username || url.password) {
+    throw new GatewayError('ROMACO_API_URL cannot contain embedded credentials.');
+  }
+  const loopback = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+  const secure = url.protocol === 'https:';
+  const localHttp = url.protocol === 'http:' && loopback.has(url.hostname.toLowerCase());
+  if (!secure && !localHttp) {
+    throw new GatewayError('ROMACO_API_URL must use HTTPS unless it targets loopback.');
+  }
+  return raw;
 }
 
 export class GatewayError extends Error {

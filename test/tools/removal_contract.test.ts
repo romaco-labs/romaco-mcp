@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bridge } from '../../src/bridge.js';
 import { chartState } from '../../src/chartState.js';
 import { createTestClient } from './_client.js';
+import type { BridgeAction } from '../../src/types.js';
 
 type Harness = Awaited<ReturnType<typeof createTestClient>>;
 
@@ -72,5 +73,46 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
     expect(result.isError).toBe(true);
     expect(result.text).toMatch(/not found/i);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('removes only the exact journaled indicator resource', async () => {
+    chartState.recordIndicator(
+      { action: 'addIndicator', indicatorType: 'RSI', params: [14] }, 'AAPL', 'rsi-14',
+    );
+    chartState.recordIndicator(
+      { action: 'addIndicator', indicatorType: 'RSI', params: [50] }, 'AAPL', 'rsi-50',
+    );
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      existingIndicators: [{ id: 'rsi-50', name: 'RSI', params: [50] }],
+    });
+    vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
+
+    const result = await h.callTool('romaco_remove_indicator', { indicatorType: 'RSI' });
+
+    expect(result.isError).toBe(false);
+    expect(chartState.snapshot().indicators.map((entry) => entry.resourceId)).toEqual(['rsi-14']);
+  });
+
+  it('removes alert by resourceId and nested options.direction without resurrection', async () => {
+    chartState.recordAlert(
+      { action: 'addAlert', price: 200, options: { direction: 'above' } }, 'AAPL', 'alert-above',
+    );
+    chartState.recordAlert(
+      { action: 'addAlert', price: 200, options: { direction: 'below' } }, 'AAPL', 'alert-below',
+    );
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      alerts: [{ id: 'alert-below', price: 200, direction: 'below' }],
+    });
+    vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
+
+    const result = await h.callTool('romaco_remove_alert', { price: 200, direction: 'below' });
+
+    expect(result.isError).toBe(false);
+    const remaining = chartState.snapshot().alerts;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].resourceId).toBe('alert-above');
+    expect(
+      (remaining[0].action as Extract<BridgeAction, { action: 'addAlert' }>).options?.direction,
+    ).toBe('above');
   });
 });

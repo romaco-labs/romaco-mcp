@@ -63,6 +63,7 @@ export class RomacoBridge {
   private readonly port: number;
   private onReadyCb: (() => void) | null = null;
   private rebindTimer: ReturnType<typeof setTimeout> | null = null;
+  private activeChartId: string | null = null;
 
   constructor(port = 7399) {
     this.port = port;
@@ -161,6 +162,7 @@ export class RomacoBridge {
     ws.on('close', () => {
       if (this.client === ws) {
         this.client = null;
+        this.activeChartId = null;
         console.error('[romaco-mcp] Browser chart disconnected');
       }
       // Only reject pending requests that belong to this socket.
@@ -207,6 +209,10 @@ export class RomacoBridge {
     return this.client !== null && this.client.readyState === 1;
   }
 
+  get chartId(): string | null {
+    return this.isConnected ? this.activeChartId : null;
+  }
+
   private send(msg: BridgeServerMessage): void {
     if (!this.isConnected) return;
     this.client!.send(JSON.stringify(msg));
@@ -215,6 +221,7 @@ export class RomacoBridge {
   private handleClientMessage(msg: BridgeClientMessage, ws?: WebSocket): void {
     if (msg.type === 'ready') {
       if (ws) this.adoptClient(ws);
+      this.activeChartId = msg.chartId;
       console.error(`[romaco-mcp] Chart ready — chartId: ${msg.chartId}`);
       // Fire reconcile off the message loop so a slow replay can't block the
       // socket; getContext/executeAction work now that the client is connected.

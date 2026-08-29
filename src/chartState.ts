@@ -19,6 +19,8 @@ export interface JournalEntry {
   action: BridgeAction;
   /** Symbol active at record time. null = applied with no data loaded. */
   symbol: string | null;
+  /** Browser resource id returned by the most recent successful apply. */
+  resourceId?: string;
 }
 
 export interface JournalSnapshot {
@@ -38,7 +40,11 @@ class ChartStateJournal {
   private alerts: JournalEntry[] = [];
 
   /** Record an applied indicator. Deduped by type+params so replays never stack. */
-  recordIndicator(action: Extract<BridgeAction, { action: 'addIndicator' }>, symbol: string | null): void {
+  recordIndicator(
+    action: Extract<BridgeAction, { action: 'addIndicator' }>,
+    symbol: string | null,
+    resourceId?: string,
+  ): void {
     const key = indicatorKey(action);
     const existing = this.indicators.findIndex(
       (e) => indicatorKey(e.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key,
@@ -46,18 +52,28 @@ class ChartStateJournal {
     if (existing !== -1) {
       // Refresh the symbol so the most-recent context wins; indicators replay
       // regardless of symbol, so this is mostly bookkeeping.
-      this.indicators[existing] = { action, symbol };
+      this.indicators[existing] = resourceId
+        ? { action, symbol, resourceId }
+        : { action, symbol };
       return;
     }
-    this.indicators.push({ action, symbol });
+    this.indicators.push(resourceId ? { action, symbol, resourceId } : { action, symbol });
   }
 
-  recordDrawing(action: Extract<BridgeAction, { action: 'addDrawing' }>, symbol: string | null): void {
-    this.drawings.push({ action, symbol });
+  recordDrawing(
+    action: Extract<BridgeAction, { action: 'addDrawing' }>,
+    symbol: string | null,
+    resourceId?: string,
+  ): void {
+    this.drawings.push(resourceId ? { action, symbol, resourceId } : { action, symbol });
   }
 
-  recordAlert(action: Extract<BridgeAction, { action: 'addAlert' }>, symbol: string | null): void {
-    this.alerts.push({ action, symbol });
+  recordAlert(
+    action: Extract<BridgeAction, { action: 'addAlert' }>,
+    symbol: string | null,
+    resourceId?: string,
+  ): void {
+    this.alerts.push(resourceId ? { action, symbol, resourceId } : { action, symbol });
   }
 
   /** Mirror the clearDrawings bridge action so reconcile won't re-add them. */
@@ -85,18 +101,51 @@ class ChartStateJournal {
     this.alerts = [];
   }
 
-  removeAlert(price: number, direction: string): void {
-    this.alerts = this.alerts.filter((e) => {
-      const a = e.action as { price?: number; direction?: string };
-      return !(a.price === price && a.direction === direction);
+  removeAlert(resourceId: string, price: number, direction: string): void {
+    const exact = this.alerts.findIndex((entry) => entry.resourceId === resourceId);
+    const fallback = this.alerts.findIndex((entry) => {
+      const action = entry.action as Extract<BridgeAction, { action: 'addAlert' }>;
+      return action.price === price && (action.options?.direction ?? 'cross') === direction;
     });
+    const index = exact >= 0 ? exact : fallback;
+    if (index >= 0) this.alerts.splice(index, 1);
   }
 
-  removeIndicator(indicatorType: string): void {
-    const key = indicatorType.toLowerCase();
-    this.indicators = this.indicators.filter(
-      (e) => (e.action as Extract<BridgeAction, { action: 'addIndicator' }>).indicatorType.toLowerCase() !== key,
+  removeIndicator(resourceId: string, indicatorType: string, params: number[] = []): void {
+    const exact = this.indicators.findIndex((entry) => entry.resourceId === resourceId);
+    const key = `${indicatorType.toLowerCase()}:${params.join(',')}`;
+    const fallback = this.indicators.findIndex((entry) =>
+      indicatorKey(entry.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key,
     );
+    const index = exact >= 0 ? exact : fallback;
+    if (index >= 0) this.indicators.splice(index, 1);
+  }
+
+  bindResourceId(action: BridgeAction, resourceId: string): void {
+    let entries: JournalEntry[] = [];
+    let match: (entry: JournalEntry) => boolean = () => false;
+    if (action.action === 'addIndicator') {
+      entries = this.indicators;
+      const key = indicatorKey(action);
+      match = (entry) => indicatorKey(entry.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key;
+    } else if (action.action === 'addAlert') {
+      entries = this.alerts;
+      match = (entry) => {
+        const candidate = entry.action as Extract<BridgeAction, { action: 'addAlert' }>;
+        return candidate.price === action.price
+          && (candidate.options?.direction ?? 'cross') === (action.options?.direction ?? 'cross');
+      };
+    } else if (action.action === 'addDrawing') {
+      entries = this.drawings;
+      match = (entry) => {
+        const candidate = entry.action as Extract<BridgeAction, { action: 'addDrawing' }>;
+        return candidate.groupId === action.groupId
+          && candidate.drawingType === action.drawingType
+          && JSON.stringify(candidate.points) === JSON.stringify(action.points);
+      };
+    }
+    const entry = entries.find(match);
+    if (entry) entry.resourceId = resourceId;
   }
 
   /** Reset everything. Used by tests. */

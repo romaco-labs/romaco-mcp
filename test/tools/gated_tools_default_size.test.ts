@@ -29,6 +29,7 @@ describe('gated tools — default (no ack) output stays under budget', () => {
   });
 
   it('romaco_get_chart_context: successful default payload stays <2KB', async () => {
+    vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('default');
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
       visibleRange: { startTimestamp: 1, endTimestamp: 2, startIndex: 0, endIndex: 499 },
       visibleCandles,
