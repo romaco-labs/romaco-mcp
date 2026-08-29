@@ -1,10 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { bridge } from '../bridge.js';
 import { enrichBridgeResult } from './_guards.js';
-import { chartState } from '../chartState.js';
+import type { ChartPort } from '../application/ports/chart.js';
+import type { ChartDesiredStatePort } from '../application/ports/chartDesiredState.js';
 
-export function registerRemoveIndicator(server: McpServer): void {
+export function registerRemoveIndicator(
+  server: McpServer,
+  chart: ChartPort,
+  desiredState: ChartDesiredStatePort,
+): void {
   server.registerTool(
     'romaco_remove_indicator',
     {
@@ -16,11 +20,9 @@ export function registerRemoveIndicator(server: McpServer): void {
       },
     },
     async ({ indicatorType }) => {
-      const context = (await bridge.getContext(false)) as {
-        existingIndicators?: Array<{ id?: string; name?: string; params?: number[] }>;
-      };
-      const indicator = context.existingIndicators?.find(
-        (candidate) => candidate.name?.toLowerCase() === indicatorType.toLowerCase(),
+      const context = await chart.getContext({ includeCandles: false });
+      const indicator = context.indicators?.find(
+        (candidate) => candidate.type.toLowerCase() === indicatorType.toLowerCase(),
       );
       if (!indicator?.id) {
         return {
@@ -29,9 +31,20 @@ export function registerRemoveIndicator(server: McpServer): void {
         };
       }
 
-      const result = await bridge.executeAction({ action: 'removeIndicator', indicatorId: indicator.id });
+      let result;
+      try {
+        result = await chart.execute(
+          { action: 'removeIndicator', indicatorId: indicator.id },
+          { expectedIdentity: context.identity },
+        );
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `romaco_remove_indicator: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
       if (result.success) {
-        chartState.removeIndicator(indicator.id, indicatorType, indicator.params ?? []);
+        desiredState.removeIndicator(indicator.id, indicatorType, indicator.params);
         return {
           content: [{ type: 'text' as const, text: `Indicator ${indicatorType} removed.` }],
         };

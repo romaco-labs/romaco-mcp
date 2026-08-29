@@ -16,6 +16,7 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
 
   beforeEach(async () => {
     chartState.clear();
+    vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('primary');
     h = await createTestClient();
   });
 
@@ -27,6 +28,7 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
 
   it('removes an indicator by resolving its type to indicatorId', async () => {
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      symbol: 'AAPL', resolution: '1d',
       existingIndicators: [{ id: 'indicator-rsi-14', name: 'RSI' }],
     });
     const execute = vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
@@ -37,11 +39,14 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
     expect(execute).toHaveBeenCalledWith({
       action: 'removeIndicator',
       indicatorId: 'indicator-rsi-14',
+      expectedIdentity: { chartId: 'primary', symbol: 'AAPL', resolution: '1d' },
     });
   });
 
   it('does not send a malformed removeIndicator action when type is absent', async () => {
-    vi.spyOn(bridge, 'getContext').mockResolvedValue({ existingIndicators: [] });
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      symbol: 'AAPL', resolution: '1d', existingIndicators: [],
+    });
     const execute = vi.spyOn(bridge, 'executeAction');
 
     const result = await h.callTool('romaco_remove_indicator', { indicatorType: 'RSI' });
@@ -53,6 +58,7 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
 
   it('removes an alert by resolving price and direction to alertId', async () => {
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      symbol: 'AAPL', resolution: '1d',
       alerts: [
         { id: 'alert-above-200', price: 200, direction: 'above' },
         { id: 'alert-below-200', price: 200, direction: 'below' },
@@ -66,11 +72,14 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
     expect(execute).toHaveBeenCalledWith({
       action: 'removeAlert',
       alertId: 'alert-below-200',
+      expectedIdentity: { chartId: 'primary', symbol: 'AAPL', resolution: '1d' },
     });
   });
 
   it('does not send a malformed removeAlert action when no alert matches', async () => {
-    vi.spyOn(bridge, 'getContext').mockResolvedValue({ alerts: [] });
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      symbol: 'AAPL', resolution: '1d', alerts: [],
+    });
     const execute = vi.spyOn(bridge, 'executeAction');
 
     const result = await h.callTool('romaco_remove_alert', { price: 200 });
@@ -88,6 +97,7 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
       { action: 'addIndicator', indicatorType: 'RSI', params: [50] }, 'AAPL', 'rsi-50',
     );
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      symbol: 'AAPL', resolution: '1d',
       existingIndicators: [{ id: 'rsi-50', name: 'RSI', params: [50] }],
     });
     vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
@@ -106,6 +116,7 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
       { action: 'addAlert', price: 200, options: { direction: 'below' } }, AAPL_DAILY, 'alert-below',
     );
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      symbol: 'AAPL', resolution: '1d',
       alerts: [{ id: 'alert-below', price: 200, direction: 'below' }],
     });
     vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });

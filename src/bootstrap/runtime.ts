@@ -13,7 +13,7 @@ import { LegacySessionDatasetSource } from './LegacySessionDatasetSource.js';
 import { AnnotateThesisUseCase } from '../application/use-cases/annotateThesis.js';
 import type { ApprovalPort } from '../application/ports/approval.js';
 import { InMemoryApprovalStore } from '../adapters/outbound/security/InMemoryApprovalStore.js';
-import type { ChartJournalPort } from '../application/ports/chartJournal.js';
+import type { ChartDesiredStatePort } from '../application/ports/chartDesiredState.js';
 import { AddDrawingUseCase } from '../application/use-cases/addDrawing.js';
 import { LegacyDrawingTemplateCatalog } from './LegacyDrawingTemplateCatalog.js';
 import { AnalyzeBatchUseCase } from '../application/use-cases/analyzeBatch.js';
@@ -21,6 +21,7 @@ import { LegacyAgentDrawingJournal } from './LegacyAgentDrawingJournal.js';
 import { ClearAgentDrawingsUseCase } from '../application/use-cases/clearAgentDrawings.js';
 import { OpenPaperPositionUseCase } from '../application/use-cases/openPaperPosition.js';
 import { InMemoryPaperPositionIdempotencyStore } from '../adapters/outbound/persistence/InMemoryPaperPositionIdempotencyStore.js';
+import { ReconcileChartStateUseCase } from '../application/use-cases/reconcileChartState.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -33,10 +34,11 @@ export interface ApplicationRuntime {
   annotateThesis: AnnotateThesisUseCase;
   addDrawing: AddDrawingUseCase;
   approvals: ApprovalPort;
-  journal: ChartJournalPort;
+  journal: ChartDesiredStatePort;
   analyzeBatch: AnalyzeBatchUseCase;
   clearAgentDrawings: ClearAgentDrawingsUseCase;
   openPaperPosition: OpenPaperPositionUseCase;
+  reconcileChart: ReconcileChartStateUseCase;
 }
 
 export function createProductionRuntime(): ApplicationRuntime {
@@ -82,6 +84,7 @@ export function createProductionRuntime(): ApplicationRuntime {
     ),
     clearAgentDrawings: new ClearAgentDrawingsUseCase(chart, agentDrawingJournal),
     openPaperPosition: new OpenPaperPositionUseCase(chart, paperPositionIdempotency),
+    reconcileChart: new ReconcileChartStateUseCase(chart, journal),
     annotateThesis: new AnnotateThesisUseCase(
       resolveThesis,
       datasets,

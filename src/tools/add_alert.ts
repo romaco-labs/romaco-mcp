@@ -1,11 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { bridge } from '../bridge.js';
 import { enrichBridgeResult } from './_guards.js';
-import { chartState } from '../chartState.js';
-import { requireLiveChartIdentity, toBridgeExpectedIdentity } from './_chartIdentity.js';
+import type { ChartPort } from '../application/ports/chart.js';
+import type { ChartDesiredStatePort } from '../application/ports/chartDesiredState.js';
 
-export function registerAddAlert(server: McpServer): void {
+export function registerAddAlert(
+  server: McpServer,
+  chart: ChartPort,
+  desiredState: ChartDesiredStatePort,
+): void {
   server.registerTool(
     'romaco_add_alert',
     {
@@ -28,24 +31,30 @@ export function registerAddAlert(server: McpServer): void {
     async ({ price, direction, note }) => {
       let identity;
       try {
-        identity = await requireLiveChartIdentity();
+        identity = await chart.getIdentity();
       } catch (error) {
         return {
           content: [{ type: 'text' as const, text: `romaco_add_alert: ${error instanceof Error ? error.message : String(error)}` }],
           isError: true,
         };
       }
-      const result = await bridge.executeAction({
-        action: 'addAlert',
-        price,
-        options: { direction, note },
-        expectedIdentity: toBridgeExpectedIdentity(identity),
-      });
+      let result;
+      try {
+        result = await chart.execute(
+          { action: 'addAlert', price, options: { direction, note } },
+          { expectedIdentity: identity },
+        );
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `romaco_add_alert: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
       if (result.success) {
-        chartState.recordAlert(
+        desiredState.recordAlert(
           { action: 'addAlert', price, options: { direction, note } },
           identity,
-          (result.data as { alert?: { id?: string } } | undefined)?.alert?.id,
+          result.resourceIds?.[0],
         );
         return {
           content: [

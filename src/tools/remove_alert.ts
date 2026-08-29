@@ -1,10 +1,14 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { bridge } from '../bridge.js';
 import { enrichBridgeResult } from './_guards.js';
-import { chartState } from '../chartState.js';
+import type { ChartPort } from '../application/ports/chart.js';
+import type { ChartDesiredStatePort } from '../application/ports/chartDesiredState.js';
 
-export function registerRemoveAlert(server: McpServer): void {
+export function registerRemoveAlert(
+  server: McpServer,
+  chart: ChartPort,
+  desiredState: ChartDesiredStatePort,
+): void {
   server.registerTool(
     'romaco_remove_alert',
     {
@@ -18,13 +22,7 @@ export function registerRemoveAlert(server: McpServer): void {
       },
     },
     async ({ price, direction }) => {
-      const context = (await bridge.getContext(false)) as {
-        alerts?: Array<{
-          id?: string;
-          price?: number;
-          direction?: 'above' | 'below' | 'cross';
-        }>;
-      };
+      const context = await chart.getContext({ includeCandles: false });
       const alert = context.alerts?.find(
         (candidate) => candidate.price === price && (!direction || candidate.direction === direction),
       );
@@ -36,12 +34,20 @@ export function registerRemoveAlert(server: McpServer): void {
         };
       }
 
-      const result = await bridge.executeAction({
-        action: 'removeAlert',
-        alertId: alert.id,
-      });
+      let result;
+      try {
+        result = await chart.execute(
+          { action: 'removeAlert', alertId: alert.id },
+          { expectedIdentity: context.identity },
+        );
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `romaco_remove_alert: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
       if (result.success) {
-        chartState.removeAlert(alert.id, price, alert.direction ?? direction ?? 'cross');
+        desiredState.removeAlert(alert.id, price, alert.direction ?? direction ?? 'cross');
         return {
           content: [{ type: 'text' as const, text: `Alert at ${price} removed.` }],
         };
