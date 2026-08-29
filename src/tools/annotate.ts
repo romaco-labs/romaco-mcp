@@ -1,6 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { bridge } from '../bridge.js';
 import { session } from '../session.js';
+import { mapChartIdentity } from '../adapters/outbound/chart/mapChartContext.js';
+import type { ChartIdentity } from '../domain/chart/model.js';
+import { toBridgeExpectedIdentity } from './_chartIdentity.js';
 import { chartState } from '../chartState.js';
 import { enrichBridgeResult } from './_guards.js';
 import { analyzeSession } from '../compression/analyze.js';
@@ -71,10 +74,21 @@ export function registerAnnotate(server: McpServer): void {
     //    the host's ms). Fail-fast here if no chart / bridge.
     let anchorTs: number;
     let zoneLeftTs: number;
+    let identity: ChartIdentity;
     let visLow = Infinity;
     let visHigh = -Infinity;
     try {
-      const ctx = (await bridge.getContext(true)) as { visibleCandles?: Array<Record<string, unknown>> };
+      const ctx = (await bridge.getContext(true)) as {
+        symbol?: unknown;
+        resolution?: unknown;
+        visibleCandles?: Array<Record<string, unknown>>;
+      };
+      const chartId = bridge.chartId;
+      if (!chartId) throw new Error('No chart identity announced. Wait for McpBridge ready.');
+      identity = mapChartIdentity(chartId, ctx);
+      if (!identity.symbol || !identity.timeframe) {
+        throw new Error('Live chart identity requires symbol and timeframe.');
+      }
       const vc = ctx?.visibleCandles ?? [];
       const last = vc[vc.length - 1];
       anchorTs = Number(last?.timestamp ?? last?.time);
@@ -94,11 +108,11 @@ export function registerAnnotate(server: McpServer): void {
       return { content: [{ type: 'text' as const, text: `romaco_annotate: ${err instanceof Error ? err.message : String(err)}` }], isError: true };
     }
 
-    const symbol = session.getLastLoad()?.symbol ?? null;
+    const expectedIdentity = toBridgeExpectedIdentity(identity);
 
     // 3. Re-annotate cleanly: drop OUR previous group (chart + journal); the
     //    user's own drawings stay. Best-effort (older browsers may not know it).
-    await bridge.executeAction({ action: 'removeDrawingsByGroup', groupId: GROUP });
+    await bridge.executeAction({ action: 'removeDrawingsByGroup', groupId: GROUP, expectedIdentity });
     chartState.removeDrawingsByGroup(GROUP);
 
     // 4. Context tiers (FAINT) — drawn whether or not there is a tradable setup.
@@ -114,8 +128,8 @@ export function registerAnnotate(server: McpServer): void {
 
     let drawn = 0;
     for (const a of context) {
-      const r = await bridge.executeAction(a);
-      if (r.success) { chartState.recordDrawing(a, symbol); drawn++; }
+      const r = await bridge.executeAction({ ...a, expectedIdentity });
+      if (r.success) { chartState.recordDrawing(a, identity); drawn++; }
     }
 
     // 5. Action tiers (entry zone + bold box) — ONLY with a real setup. Honest
@@ -134,8 +148,8 @@ export function registerAnnotate(server: McpServer): void {
           style: STYLE_ZONE,
           groupId: GROUP,
         };
-        const rz = await bridge.executeAction(zone);
-        if (rz.success) { chartState.recordDrawing(zone, symbol); drawn++; }
+        const rz = await bridge.executeAction({ ...zone, expectedIdentity });
+        if (rz.success) { chartState.recordDrawing(zone, identity); drawn++; }
       }
 
       // Anchor the box ~20 bars back (zoneLeftTs) so it renders over visible
@@ -151,12 +165,12 @@ export function registerAnnotate(server: McpServer): void {
         label: `${thesis.verdict.toUpperCase()} · R/R ${setup.rr}`,
         groupId: GROUP,
       };
-      const rb = await bridge.executeAction(box);
+      const rb = await bridge.executeAction({ ...box, expectedIdentity });
       if (!rb.success) {
         const { text, isError } = enrichBridgeResult('romaco_annotate', rb);
         return { content: [{ type: 'text' as const, text }], isError };
       }
-      chartState.recordDrawing(box, symbol);
+      chartState.recordDrawing(box, identity);
       drawn++;
 
       // Make the whole trade visible: a target above the highs (or a stop

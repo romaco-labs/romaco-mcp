@@ -1,0 +1,10 @@
+{
+  "kind": "chart-state",
+  "chartId": "chart_aapl",
+  "symbol": "AAPL",
+  "timeframe": "1d",
+  "datasetId": "fixture:real-aapl",
+  "indicators": [],
+  "drawings": [],
+  "alerts": []
+}

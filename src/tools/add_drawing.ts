@@ -4,7 +4,7 @@ import { bridge } from '../bridge.js';
 import { enrichBridgeResult } from './_guards.js';
 import { listDrawingTypeNames } from '../data/templateCatalog.js';
 import { chartState } from '../chartState.js';
-import { session } from '../session.js';
+import { requireLiveChartIdentity, toBridgeExpectedIdentity } from './_chartIdentity.js';
 
 export function registerAddDrawing(server: McpServer): void {
   const drawingTypes = listDrawingTypeNames();
@@ -65,6 +65,15 @@ export function registerAddDrawing(server: McpServer): void {
       },
     },
     async ({ drawingType, points, label, style, paneId, groupId }) => {
+      let identity;
+      try {
+        identity = await requireLiveChartIdentity();
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `romaco_add_drawing: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
+      }
       const result = await bridge.executeAction({
         action: 'addDrawing',
         drawingType,
@@ -73,11 +82,12 @@ export function registerAddDrawing(server: McpServer): void {
         style,
         paneId,
         groupId,
+        expectedIdentity: toBridgeExpectedIdentity(identity),
       });
       if (result.success) {
         chartState.recordDrawing(
           { action: 'addDrawing', drawingType, points, label, style, paneId, groupId },
-          session.getLastLoad()?.symbol ?? null,
+          identity,
         );
         const where = paneId && paneId !== 'main' ? ` in pane "${paneId}"` : '';
         return { content: [{ type: 'text' as const, text: `${drawingType}${where} drawn on chart` }] };

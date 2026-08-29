@@ -35,7 +35,7 @@ function fakeResponse(opts: { status?: number; ok?: boolean; json?: unknown; tex
   } as Response;
 }
 
-describe('isPro', () => {
+describe('legacy gateway-token predicate', () => {
   it('false when ROMACO_TOKEN unset', () => {
     expect(isPro()).toBe(false);
   });
@@ -64,6 +64,20 @@ describe('gatewayApiUrl', () => {
   it('strips trailing slashes', () => {
     process.env.ROMACO_API_URL = 'https://api.romaco.tech///';
     expect(gatewayApiUrl()).toBe('https://api.romaco.tech');
+  });
+
+  it('rejects non-HTTPS remote endpoints and embedded credentials', () => {
+    process.env.ROMACO_API_URL = 'http://api.romaco.tech';
+    expect(() => gatewayApiUrl()).toThrow(/HTTPS/i);
+    process.env.ROMACO_API_URL = 'https://user:secret@api.romaco.tech';
+    expect(() => gatewayApiUrl()).toThrow(/credentials/i);
+  });
+
+  it('allows HTTP only for loopback development endpoints', () => {
+    for (const url of ['http://localhost:8000', 'http://127.0.0.1:8000', 'http://[::1]:8000']) {
+      process.env.ROMACO_API_URL = url;
+      expect(gatewayApiUrl()).toBe(url);
+    }
   });
 });
 
@@ -102,6 +116,18 @@ describe('callGateway', () => {
     expect(url).toBe('https://api.romaco.tech/gateway/levels');
   });
 
+  it('rejects insecure remote URL before fetch and never exposes token/body in logs', async () => {
+    process.env.ROMACO_TOKEN = 'super-secret-token';
+    process.env.ROMACO_API_URL = 'http://api.romaco.tech';
+    const fetchMock = vi.fn();
+    const consoleMock = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callGateway('/gateway/thesis', { private: 'candle-body' })).rejects.toThrow(/HTTPS/i);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(consoleMock).not.toHaveBeenCalled();
+  });
+
   it('401 → GatewayError(status=401), flagged as auth error', async () => {
     process.env.ROMACO_TOKEN = 'sk-bad';
     vi.stubGlobal('fetch', vi.fn(async () => fakeResponse({ status: 401, ok: false })));
@@ -122,7 +148,7 @@ describe('callGateway', () => {
     expect(isAuthError(err)).toBe(true);
   });
 
-  it('500 → GatewayError(status=500), NOT an auth error (caller falls back to local)', async () => {
+  it('500 → GatewayError(status=500), not an auth error', async () => {
     process.env.ROMACO_TOKEN = 'sk-ok';
     vi.stubGlobal(
       'fetch',
@@ -135,7 +161,7 @@ describe('callGateway', () => {
     expect(isAuthError(err)).toBe(false);
   });
 
-  it('network failure → GatewayError without status (caller falls back to local)', async () => {
+  it('network failure → GatewayError without status', async () => {
     process.env.ROMACO_TOKEN = 'sk-ok';
     vi.stubGlobal(
       'fetch',

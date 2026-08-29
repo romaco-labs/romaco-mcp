@@ -35,6 +35,8 @@ describe('romaco_load_candles — session clears on failure (B3)', () => {
     });
     expect(res.isError).toBe(false);
     expect(session.getLastLoad()?.symbol).toBe('OK');
+    expect(session.getLastLoad()?.datasetId).toMatch(/^dataset_/);
+    expect(res.text).toMatch(/datasetId=dataset_/);
   });
 
   it('preserves session when raw load fails with empty array', async () => {

@@ -1,0 +1,99 @@
+[
+  {
+    "id": "H06_directional_thesis",
+    "split": "heldout",
+    "category": "headless",
+    "status": "planned",
+    "plannedReason": "Numeric thesis claims require grading an actual agent final answer; no offline transcript/model loop exists.",
+    "prompt": "Produce an evidence-backed thesis for this directional synthetic market and state only setup values supported by computed output.",
+    "oracleWorkflow": "directional-thesis",
+    "fixtureRefs": ["directional-market"],
+    "graderRefs": ["contract", "financial-invariants", "claims", "identity", "budget"],
+    "expectedOutcomes": ["directional setup geometry is valid", "reward/risk recomputes", "all numeric claims are supported"],
+    "budget": { "maxToolCalls": 3, "maxResultBytes": 12000, "maxDurationMs": 2500 }
+  },
+  {
+    "id": "H09_batch_partial_failure",
+    "split": "heldout",
+    "category": "headless",
+    "status": "runnable",
+    "prompt": "Rank AAPL, SPY, and an unavailable symbol. Preserve successful results, explain the one failure, and bind the top pick explicitly.",
+    "oracleWorkflow": "batch-partial-failure",
+    "fixtureRefs": ["batch-partial"],
+    "graderRefs": ["contract", "identity", "financial-invariants", "recovery", "budget"],
+    "expectedOutcomes": ["valid symbols are ranked", "failure is structured", "sessionDatasetId equals top item datasetId"],
+    "budget": { "maxToolCalls": 2, "maxResultBytes": 18000, "maxDurationMs": 3500 }
+  },
+  {
+    "id": "L05_annotate_atomic",
+    "split": "heldout",
+    "category": "live",
+    "status": "runnable",
+    "prompt": "After explicit approval, annotate the current AAPL thesis twice. Keep one current Romaco group and preserve the user's trendline.",
+    "oracleWorkflow": "annotate-atomic-idempotent",
+    "fixtureRefs": ["real-aapl", "chart-user-drawings", "approval-state"],
+    "graderRefs": ["contract", "identity", "terminal-state", "safety", "budget"],
+    "expectedOutcomes": ["replace operation is atomic", "no duplicate group", "user state remains"],
+    "budget": { "maxToolCalls": 5, "maxResultBytes": 14000, "maxDurationMs": 4000 }
+  },
+  {
+    "id": "L06_cross_symbol_block",
+    "split": "heldout",
+    "category": "live",
+    "status": "runnable",
+    "prompt": "Try to draw an AAPL analysis on a connected TSLA chart. Fail safely and explain how to match identities.",
+    "oracleWorkflow": "cross-symbol-hard-stop",
+    "fixtureRefs": ["real-aapl", "chart-tsla-mismatch"],
+    "graderRefs": ["contract", "identity", "safety", "recovery", "trace", "budget"],
+    "expectedOutcomes": ["result is CHART_CONTEXT_MISMATCH", "zero chart writes", "recovery names expected and actual symbols"],
+    "budget": { "maxToolCalls": 3, "maxResultBytes": 9000, "maxDurationMs": 2500 }
+  },
+  {
+    "id": "S01_reconnect_symbol_scope",
+    "split": "heldout",
+    "category": "state-recovery",
+    "status": "runnable",
+    "prompt": "Reconnect from an AAPL chart to a TSLA chart and ensure no symbol-bound AAPL drawings or alerts are replayed.",
+    "oracleWorkflow": "reconnect-symbol-scope",
+    "fixtureRefs": ["real-aapl", "real-tsla", "reconnect-state"],
+    "graderRefs": ["identity", "terminal-state", "safety", "trace", "budget"],
+    "expectedOutcomes": ["zero cross-symbol drawing replay", "zero cross-symbol alert replay", "desired state remains attributable"],
+    "budget": { "maxToolCalls": 5, "maxResultBytes": 14000, "maxDurationMs": 4500 }
+  },
+  {
+    "id": "S05_explicit_dataset_race",
+    "split": "heldout",
+    "category": "state-recovery",
+    "status": "runnable",
+    "prompt": "Load AAPL, then TSLA, then retrieve the earlier AAPL artifact by its exact analysisId without relying on last-loaded state.",
+    "oracleWorkflow": "explicit-dataset-race",
+    "fixtureRefs": ["real-aapl", "real-tsla"],
+    "graderRefs": ["contract", "identity", "terminal-state", "budget"],
+    "expectedOutcomes": ["requested AAPL artifact is returned", "explicit lookup leaves TSLA active state unchanged", "analysisId points to AAPL datasetId"],
+    "budget": { "maxToolCalls": 4, "maxResultBytes": 14000, "maxDurationMs": 3500 }
+  },
+  {
+    "id": "A03_paper_idempotency",
+    "split": "heldout",
+    "category": "approval",
+    "status": "runnable",
+    "prompt": "Open one approved paper position, retry with the same idempotency key, then attempt a different payload with that key.",
+    "oracleWorkflow": "paper-position-idempotency",
+    "fixtureRefs": ["chart-aapl", "approval-state"],
+    "graderRefs": ["contract", "financial-invariants", "safety", "terminal-state", "budget"],
+    "expectedOutcomes": ["retry returns same position", "only one position exists", "changed payload returns IDEMPOTENCY_CONFLICT"],
+    "budget": { "maxToolCalls": 4, "maxResultBytes": 10000, "maxDurationMs": 2500 }
+  },
+  {
+    "id": "D02_atomic_disconnect",
+    "split": "heldout",
+    "category": "degraded",
+    "status": "runnable",
+    "prompt": "Replace a Romaco drawing group while the bridge disconnects mid-operation, then reconnect and converge without duplicates or half-applied state.",
+    "oracleWorkflow": "atomic-disconnect-recovery",
+    "fixtureRefs": ["chart-user-drawings", "bridge-disconnect"],
+    "graderRefs": ["contract", "terminal-state", "safety", "recovery", "trace", "budget"],
+    "expectedOutcomes": ["partial apply is reported honestly", "journal never claims unknown writes", "reconnect converges to one complete group"],
+    "budget": { "maxToolCalls": 5, "maxResultBytes": 14000, "maxDurationMs": 5000 }
+  }
+]

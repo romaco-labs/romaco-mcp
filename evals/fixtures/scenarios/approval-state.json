@@ -1,0 +1,7 @@
+{
+  "kind": "approval-store",
+  "issued": [],
+  "consumed": [],
+  "defaultTtlMs": 60000,
+  "singleUse": true
+}

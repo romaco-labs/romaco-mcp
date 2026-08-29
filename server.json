@@ -1,0 +1,23 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.romaco-labs/romaco-mcp",
+  "title": "Romaco MCP",
+  "description": "Grounded market analysis and live romaco-charts control for MCP-compatible AI agents.",
+  "repository": {
+    "url": "https://github.com/romaco-labs/romaco-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://www.romaco.io",
+  "version": "0.0.4",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@romaco/mcp",
+      "version": "0.0.4",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}

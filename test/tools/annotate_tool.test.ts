@@ -6,7 +6,7 @@ import { session } from '../../src/session.js';
 import { uptrendCandles, sidewaysCandles } from '../compression/fixtures.js';
 import { analyzeSession } from '../../src/compression/analyze.js';
 import type { LoadResponse } from '../../src/data/types.js';
-import type { BridgeAction } from '../../src/types.js';
+import type { BridgeAction, BridgeAgentDrawingInput } from '../../src/types.js';
 
 // The chart's timestamp unit (ms here) is deliberately DIFFERENT from the MCP
 // session candle unit (yfinance seconds). annotate must anchor on the chart's
@@ -21,14 +21,42 @@ function loadSession(candles: LoadResponse['candles']): void {
 function allActions(): BridgeAction[] {
   return vi.mocked(bridge.executeAction).mock.calls.map((c) => c[0]);
 }
-function drawDrawings(): Array<Extract<BridgeAction, { action: 'addDrawing' }>> {
-  return allActions().filter((a): a is Extract<BridgeAction, { action: 'addDrawing' }> => a.action === 'addDrawing');
+function drawDrawings(): Array<BridgeAgentDrawingInput & { groupId: string }> {
+  const replacement = allActions().find(
+    (action): action is Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }> =>
+      action.action === 'replaceAgentDrawingGroup',
+  );
+  return (replacement?.drawings ?? []).map((drawing) => ({
+    ...drawing,
+    groupId: replacement?.groupId ?? '',
+  }));
+}
+async function approvedAnnotate(
+  callTool: (name: string, args?: Record<string, unknown>) => Promise<any>,
+  analysisId?: string,
+) {
+  const challenge = await callTool('romaco_annotate', analysisId ? { analysisId } : {});
+  expect(challenge.raw.structuredContent).toMatchObject({
+    status: 'error',
+    error: { code: 'APPROVAL_REQUIRED' },
+  });
+  const parameters = challenge.raw.structuredContent.error.recovery.parameters;
+  return callTool('romaco_annotate', {
+    analysisId: parameters.analysisId,
+    approvalToken: parameters.approvalToken,
+  });
 }
 const isPositionBox = (t: string): boolean => /Position$/.test(t); // longPosition | shortPosition
 
 beforeEach(() => {
+  vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('primary');
   vi.spyOn(bridge, 'getContext').mockResolvedValue({
-    visibleCandles: [{ timestamp: CHART_ANCHOR - 86_400_000 }, { timestamp: CHART_ANCHOR }],
+    symbol: 'TEST',
+    resolution: '1d',
+    visibleCandles: [
+      { timestamp: CHART_ANCHOR - 86_400_000, open: 100, high: 110, low: 90, close: 105, volume: 1_000 },
+      { timestamp: CHART_ANCHOR, open: 105, high: 115, low: 95, close: 110, volume: 1_100 },
+    ],
   });
   vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
 });
@@ -48,11 +76,14 @@ describe('romaco_annotate (stage 2)', () => {
 
     const { callTool, close } = await createTestClient();
     try {
-      const res = await callTool('romaco_annotate', {});
+      const res = await approvedAnnotate(callTool);
       expect(res.isError).toBe(false);
 
-      // Group-scoped replace is the FIRST bridge action.
-      expect(allActions()[0]).toMatchObject({ action: 'removeDrawingsByGroup', groupId: 'romaco-thesis' });
+      // One atomic, idempotent group replacement owns the entire annotation.
+      expect(allActions()[0]).toMatchObject({
+        action: 'replaceAgentDrawingGroup',
+        groupId: 'romaco-mcp/thesis',
+      });
 
       const draws = drawDrawings();
       // Bold action box, exact entry/stop/target order.
@@ -70,8 +101,15 @@ describe('romaco_annotate (stage 2)', () => {
       // Entry-zone band.
       expect(draws.some((d) => d.drawingType === 'rectangle')).toBe(true);
       // Everything under the one group, and journaled for replay.
-      expect(draws.every((d) => d.groupId === 'romaco-thesis')).toBe(true);
-      expect(chartState.snapshot().drawings.length).toBe(draws.length);
+      expect(draws.every((d) => d.groupId === 'romaco-mcp/thesis')).toBe(true);
+      const journal = chartState.snapshot();
+      expect(journal.drawings).toHaveLength(0);
+      expect(journal.drawingGroups).toHaveLength(1);
+      expect(journal.drawingGroups[0].action).toMatchObject({
+        action: 'replaceAgentDrawingGroup',
+        groupId: 'romaco-mcp/thesis',
+        drawings: expect.arrayContaining(draws.map(({ groupId: _groupId, ...drawing }) => drawing)),
+      });
     } finally {
       await close();
     }
@@ -81,7 +119,7 @@ describe('romaco_annotate (stage 2)', () => {
     loadSession(uptrendCandles(220, 100, 0.6));
     const { callTool, close } = await createTestClient();
     try {
-      await callTool('romaco_annotate', {});
+      await approvedAnnotate(callTool);
       const box = drawDrawings().find((d) => isPositionBox(d.drawingType))!;
       // Anchored ~20 bars back so the box overlaps visible candles instead of
       // hanging off the right edge. With a 2-candle mock, zone-left = vc[0].
@@ -100,12 +138,12 @@ describe('romaco_annotate (stage 2)', () => {
 
     const { callTool, close } = await createTestClient();
     try {
-      const res = await callTool('romaco_annotate', {});
+      const res = await approvedAnnotate(callTool);
       expect(res.isError).toBe(false);
       const draws = drawDrawings();
       expect(draws.some((d) => isPositionBox(d.drawingType))).toBe(false); // no entry/stop/target box
       expect(draws.some((d) => d.drawingType === 'rectangle')).toBe(false); // no entry zone
-      expect(res.text).toMatch(/standing aside/i);
+      expect(res.text).toMatch(/stand_aside/i);
     } finally {
       await close();
     }
@@ -130,7 +168,7 @@ describe('romaco_annotate (stage 2)', () => {
     );
     const { callTool, close } = await createTestClient();
     try {
-      const res = await callTool('romaco_annotate', {});
+      const res = await approvedAnnotate(callTool);
       expect(res.isError).toBe(true);
       expect(res.text).toMatch(/McpBridge|No chart connected/i);
       expect(drawDrawings()).toHaveLength(0);
@@ -144,7 +182,7 @@ describe('romaco_annotate (stage 2)', () => {
     vi.mocked(bridge.executeAction).mockResolvedValue({ success: false, error: 'Chart not ready' });
     const { callTool, close } = await createTestClient();
     try {
-      const res = await callTool('romaco_annotate', {});
+      const res = await approvedAnnotate(callTool);
       expect(res.isError).toBe(true);
       expect(chartState.snapshot().drawings).toHaveLength(0);
     } finally {

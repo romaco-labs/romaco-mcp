@@ -1,18 +1,17 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { bridge } from './bridge.js';
-import { reconcileChartState } from './reconcile.js';
+import { bridge } from './bootstrap/bridgeRuntime.js';
+import { ChartReadyReconciliationAdapter } from './bootstrap/ChartReadyReconciliationAdapter.js';
+import { createProductionRuntime } from './bootstrap/runtime.js';
 import { createServer } from './server.js';
 
 async function main(): Promise<void> {
-  // Replay applied overlays whenever a (re)created chart announces `ready`.
-  bridge.setOnReady(() => {
-    void reconcileChartState();
-  });
+  const runtime = createProductionRuntime();
+  new ChartReadyReconciliationAdapter(runtime.reconcileChart).attach(bridge);
 
   await bridge.start();
 
-  const server = createServer();
+  const server = createServer(runtime);
   const transport = new StdioServerTransport();
   await server.connect(transport);
 

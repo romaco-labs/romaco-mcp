@@ -20,11 +20,11 @@ const hs: PatternHit = {
 
 describe('patternGroupId', () => {
   it('groups by family', () => {
-    expect(patternGroupId('head_shoulders')).toBe('romaco-pattern-hs');
-    expect(patternGroupId('inverse_head_shoulders')).toBe('romaco-pattern-hs');
-    expect(patternGroupId('double_top')).toBe('romaco-pattern-double');
-    expect(patternGroupId('ascending_triangle')).toBe('romaco-pattern-triangle');
-    expect(patternGroupId('bear_flag')).toBe('romaco-pattern-flag');
+    expect(patternGroupId('head_shoulders')).toBe('romaco-mcp/pattern/hs');
+    expect(patternGroupId('inverse_head_shoulders')).toBe('romaco-mcp/pattern/hs');
+    expect(patternGroupId('double_top')).toBe('romaco-mcp/pattern/double');
+    expect(patternGroupId('ascending_triangle')).toBe('romaco-mcp/pattern/triangle');
+    expect(patternGroupId('bear_flag')).toBe('romaco-mcp/pattern/flag');
   });
 });
 
@@ -100,7 +100,7 @@ describe('mapPatternToDrawings', () => {
     expect(silhouette.points.map((p) => p.price)).toEqual([120, 104, 119.5, 105, 120.2]);
     const neckline = out.find((d) => d.label === 'triple_top neckline')!;
     expect(neckline.points[0].price).toBe(104); // far valley, not the near one
-    expect(patternGroupId('triple_bottom')).toBe('romaco-pattern-double');
+    expect(patternGroupId('triple_bottom')).toBe('romaco-mcp/pattern/double');
   });
 
   it('triangle: draws only sides with >= 2 points', () => {
@@ -201,7 +201,7 @@ describe('mapPatternToDrawings', () => {
     const a = out2.find((d) => d.drawingType === 'abcd')!;
     expect(a.points.map((p) => p.price)).toEqual([90, 110, 97.6, 115]);
 
-    expect(patternGroupId('bat_bullish')).toBe('romaco-pattern-harmonic');
+    expect(patternGroupId('bat_bullish')).toBe('romaco-mcp/pattern/harmonic');
   });
 
   it('gap → translucent rectangle over the open zone + fill-level invalidation line', () => {
@@ -221,8 +221,8 @@ describe('mapPatternToDrawings', () => {
     expect(rect.style?.fillColor).toBeTruthy();
     expect(out.some((d) => d.label === 'gap_up invalidation')).toBe(true);
     expect(out.some((d) => d.label === 'gap_up target')).toBe(false); // none invented
-    expect(patternGroupId('gap_down')).toBe('romaco-pattern-gap');
-    expect(patternGroupId('rounding_bottom')).toBe('romaco-pattern-cup');
+    expect(patternGroupId('gap_down')).toBe('romaco-mcp/pattern/gap');
+    expect(patternGroupId('rounding_bottom')).toBe('romaco-mcp/pattern/cup');
   });
 
   it('no drawable geometry → empty (and no orphan trigger lines)', () => {

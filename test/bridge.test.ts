@@ -264,6 +264,59 @@ describe('RomacoBridge', () => {
   });
 
   describe('concurrency & resilience', () => {
+    it('keeps drawing and scoped-removal actions working after browser reconnect', async () => {
+      const port = nextPort();
+      const b = await bridge(port);
+      const first = await connectClient(port);
+      const firstActions: unknown[] = [];
+
+      first.on('message', (raw) => {
+        const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
+        if (msg.type !== 'execute_action') return;
+        firstActions.push(msg.action);
+        first.send(JSON.stringify({
+          type: 'action_result',
+          requestId: msg.requestId,
+          result: { success: true },
+        }));
+      });
+
+      const drawing = {
+        action: 'addDrawing' as const,
+        drawingType: 'trendline',
+        points: [
+          { timestamp: 1_786_865_746, price: 100 },
+          { timestamp: 1_786_866_346, price: 110 },
+        ],
+        groupId: 'romaco-e2e',
+      };
+      await expect(b.executeAction(drawing)).resolves.toMatchObject({ success: true });
+      expect(firstActions).toEqual([drawing]);
+
+      const second = await connectClient(port);
+      const secondActions: unknown[] = [];
+      second.on('message', (raw) => {
+        const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
+        if (msg.type !== 'execute_action') return;
+        secondActions.push(msg.action);
+        second.send(JSON.stringify({
+          type: 'action_result',
+          requestId: msg.requestId,
+          result: { success: true },
+        }));
+      });
+
+      await expect(
+        b.executeAction({ action: 'removeDrawingsByGroup', groupId: 'romaco-e2e' }),
+      ).resolves.toMatchObject({ success: true });
+      expect(secondActions).toEqual([
+        { action: 'removeDrawingsByGroup', groupId: 'romaco-e2e' },
+      ]);
+      expect(b.isConnected).toBe(true);
+
+      second.close();
+    });
+
     it('handles multiple concurrent requests with independent requestIds', async () => {
       const port = nextPort();
       const b = await bridge(port);

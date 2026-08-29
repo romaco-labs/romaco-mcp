@@ -1,13 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { bridge } from '../bridge.js';
 import { session } from '../session.js';
 import { chartState } from '../chartState.js';
-import { enrichBridgeResult } from './_guards.js';
 import { selectRecentPatterns } from '../compression/patterns.js';
 import { cachedDetectPatterns } from '../compression/scanCache.js';
 import { PATTERN_KINDS } from '../compression/types.js';
 import { mapPatternToDrawings, patternGroupId } from './_patternDrawings.js';
+import type { ChartPort } from '../application/ports/chart.js';
+import type { ChartIdentity } from '../domain/chart/model.js';
 
 const DESC =
   'Draw the GEOMETRY of a detected chart pattern on the user\'s browser chart: head & shoulders ' +
@@ -20,7 +20,7 @@ const DESC =
   'or romaco_thesis finds something; call it ONLY after the user accepts. Requires <McpBridge /> ' +
   'mounted and candles loaded (romaco_load_candles), with the SAME symbol/range on the chart.';
 
-export function registerDrawPattern(server: McpServer): void {
+export function registerDrawPattern(server: McpServer, chart: ChartPort): void {
   server.registerTool(
     'romaco_draw_pattern',
     {
@@ -40,12 +40,19 @@ export function registerDrawPattern(server: McpServer): void {
     },
     async ({ kind, rank }) => {
       // 1. Re-detect locally — same anti-drift principle as romaco_annotate.
-      let candles;
-      try {
-        candles = session.requireCandles();
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: err instanceof Error ? err.message : String(err) }], isError: true };
+      const load = session.getLastLoad();
+      if (!load) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: 'No candle data loaded. Call romaco_load_candles first with source, symbol, and timeframe.',
+          }],
+          isError: true,
+        };
       }
+      // Capture candles and identity as one immutable workflow handle before any
+      // await. A concurrent load must not let A geometry validate against B.
+      const candles = load.candles;
       const all = cachedDetectPatterns(candles);
       const recent = selectRecentPatterns(all, candles[0].timestamp, candles[candles.length - 1].timestamp);
       const matching = (kind ? recent.filter((p) => p.kind === kind) : recent).sort(
@@ -68,19 +75,18 @@ export function registerDrawPattern(server: McpServer): void {
       let tsScale = 1;
       let visLow = Infinity;
       let visHigh = -Infinity;
+      let expectedIdentity: ChartIdentity | null = null;
       try {
-        const ctx = (await bridge.getContext(true)) as {
-          symbol?: string;
-          visibleCandles?: Array<Record<string, unknown>>;
-        };
-        const vc = ctx?.visibleCandles ?? [];
+        const context = await chart.getContext({ includeCandles: true });
+        expectedIdentity = context.identity;
+        const vc = context.visibleCandles ?? [];
         for (const c of vc) {
           const lo = Number(c.low);
           const hi = Number(c.high);
           if (Number.isFinite(lo) && lo < visLow) visLow = lo;
           if (Number.isFinite(hi) && hi > visHigh) visHigh = hi;
         }
-        const chartTs = Number(vc[0]?.timestamp ?? vc[0]?.time);
+        const chartTs = vc[0]?.timestamp;
         if (!vc.length || !Number.isFinite(chartTs)) {
           return {
             content: [{ type: 'text' as const, text: 'romaco_draw_pattern: the chart has no visible candles to anchor on. Load a symbol in the chart first.' }],
@@ -91,12 +97,14 @@ export function registerDrawPattern(server: McpServer): void {
         // Sniff instead of hardcoding — raw-source sessions may already be ms.
         if (chartTs > 1e12 && candles[0].timestamp < 1e11) tsScale = 1000;
 
-        const sessionSymbol = session.getLastLoad()?.symbol;
-        if (ctx.symbol && sessionSymbol && ctx.symbol.toUpperCase() !== sessionSymbol.toUpperCase()) {
+        if (
+          context.identity.symbol !== load.symbol.toUpperCase()
+          || context.identity.timeframe !== load.timeframe
+        ) {
           return {
             content: [{
               type: 'text' as const,
-              text: `romaco_draw_pattern: chart shows ${ctx.symbol} but the loaded analysis is for ${sessionSymbol}. Reload matching data (romaco_load_candles or switch the chart) before drawing.`,
+              text: `romaco_draw_pattern: chart shows ${context.identity.symbol ?? 'unknown'} ${context.identity.timeframe ?? 'unknown'} but loaded analysis is for ${load.symbol} ${load.timeframe}.`,
             }],
             isError: true,
           };
@@ -108,36 +116,47 @@ export function registerDrawPattern(server: McpServer): void {
         };
       }
 
-      const symbol = session.getLastLoad()?.symbol ?? null;
       const groupId = patternGroupId(hit.kind);
 
-      // 3. Atomic family replace: drop OUR previous set (chart + journal);
-      //    other families and the user's drawings stay.
-      await bridge.executeAction({ action: 'removeDrawingsByGroup', groupId });
-      chartState.removeDrawingsByGroup(groupId);
-
-      // 4. Draw. Best-effort per drawing; journal each success so the set
-      //    survives tab reloads (reconcile + localStorage rehydration).
+      // 3. Build complete family payload, then replace it in one chart action.
       const drawings = mapPatternToDrawings(hit, tsScale, groupId);
       if (!drawings.length) {
         return {
           content: [{ type: 'text' as const, text: `${hit.kind} detected but it carries no drawable anchor geometry — nothing drawn.` }],
         };
       }
-      let drawn = 0;
-      let lastFailure: Awaited<ReturnType<typeof bridge.executeAction>> | null = null;
-      for (const a of drawings) {
-        const r = await bridge.executeAction(a);
-        if (r.success) {
-          chartState.recordDrawing(a, symbol);
-          drawn++;
-        } else {
-          lastFailure = r;
+      const firstHitTs = Math.min(...hit.points.map((point) => point.ts));
+      const lastHitTs = Math.max(...hit.points.map((point) => point.ts));
+      const idempotencyKey = `${groupId}:${hit.kind}:${firstHitTs}:${lastHitTs}:${tsScale}`;
+      try {
+        const replaced = await chart.replaceDrawingGroup({
+          groupId,
+          drawings,
+          expectedIdentity: expectedIdentity!,
+          idempotencyKey,
+        });
+        if (!replaced.success) {
+          throw new Error(replaced.error ?? 'Chart rejected atomic pattern replacement.');
         }
-      }
-      if (drawn === 0 && lastFailure) {
-        const { text, isError } = enrichBridgeResult('romaco_draw_pattern', lastFailure);
-        return { content: [{ type: 'text' as const, text }], isError };
+        const identity = expectedIdentity!;
+        chartState.replaceDrawingGroup({
+          action: 'replaceAgentDrawingGroup',
+          groupId,
+          idempotencyKey,
+          expectedIdentity: {
+            chartId: identity.chartId,
+            symbol: identity.symbol!,
+            resolution: identity.timeframe!,
+          },
+          drawings: drawings.map(({ drawingType, points, label, style, paneId }) => ({
+            drawingType, points, label, style, paneId,
+          })),
+        }, identity, replaced.resourceIds);
+      } catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `romaco_draw_pattern: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        };
       }
 
       // Keep the whole pattern visible: a projected target above the highs
@@ -152,7 +171,14 @@ export function registerDrawPattern(server: McpServer): void {
           const needHigh = Math.max(visHigh, ...levels);
           if (needLow < visLow || needHigh > visHigh) {
             const pad = (needHigh - needLow) * 0.04;
-            await bridge.executeAction({ action: 'setPriceRange', min: needLow - pad, max: needHigh + pad });
+            try {
+              await chart.execute(
+                { action: 'setPriceRange', min: needLow - pad, max: needHigh + pad },
+                { expectedIdentity: expectedIdentity! },
+              );
+            } catch {
+              // best-effort view pin after successful atomic replacement
+            }
           }
         }
       }
@@ -165,7 +191,7 @@ export function registerDrawPattern(server: McpServer): void {
         content: [{
           type: 'text' as const,
           text:
-            `Drew ${hit.kind} (confidence ${hit.confidence.toFixed(2)}) — ${drawn} drawing(s)` +
+            `Drew ${hit.kind} (confidence ${hit.confidence.toFixed(2)}) — ${drawings.length} drawing(s)` +
             `${extras ? `, ${extras}` : ''}. Re-running replaces group '${groupId}'.`,
         }],
       };

@@ -1,0 +1,10 @@
+{
+  "kind": "chart-state",
+  "chartId": "chart_tsla",
+  "symbol": "TSLA",
+  "timeframe": "1d",
+  "datasetId": "fixture:real-tsla",
+  "indicators": [],
+  "drawings": [],
+  "alerts": []
+}

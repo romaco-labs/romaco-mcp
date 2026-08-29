@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createTestClient } from './_client.js';
 import { bridge } from '../../src/bridge.js';
 import { chartState } from '../../src/chartState.js';
 import { session } from '../../src/session.js';
 import { doubleTopCandles, headShouldersCandles } from '../compression/fixtures.js';
 import type { LoadResponse } from '../../src/data/types.js';
-import type { BridgeAction } from '../../src/types.js';
+import type { BridgeAction, BridgeAgentDrawingInput } from '../../src/types.js';
+import type { ChartPort } from '../../src/application/ports/chart.js';
+import { createChartId } from '../../src/domain/chart/model.js';
+import { registerDrawPattern } from '../../src/tools/draw_pattern.js';
 
 // Chart speaks milliseconds; the MCP session candles are unix seconds. The
 // tool must sniff the mismatch and scale pattern timestamps ×1000.
@@ -18,14 +24,32 @@ function loadSession(candles: LoadResponse['candles'], symbol = 'TEST'): void {
 function allActions(): BridgeAction[] {
   return vi.mocked(bridge.executeAction).mock.calls.map((c) => c[0]);
 }
-function drawDrawings(): Array<Extract<BridgeAction, { action: 'addDrawing' }>> {
-  return allActions().filter((a): a is Extract<BridgeAction, { action: 'addDrawing' }> => a.action === 'addDrawing');
+function drawDrawings(): Array<BridgeAgentDrawingInput & { groupId: string }> {
+  const replacement = allActions().find(
+    (action): action is Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }> =>
+      action.action === 'replaceAgentDrawingGroup',
+  );
+  return (replacement?.drawings ?? []).map((drawing) => ({
+    ...drawing,
+    groupId: replacement?.groupId ?? '',
+  }));
 }
 
+const chartCandle = (timestamp: number, low = 90, high = 131) => ({
+  timestamp,
+  open: 100,
+  high,
+  low,
+  close: 105,
+  volume: 1_000,
+});
+
 beforeEach(() => {
+  vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('primary');
   vi.spyOn(bridge, 'getContext').mockResolvedValue({
     symbol: 'TEST',
-    visibleCandles: [{ timestamp: CHART_ANCHOR - 86_400_000 }, { timestamp: CHART_ANCHOR }],
+    resolution: '1h',
+    visibleCandles: [chartCandle(CHART_ANCHOR - 86_400_000), chartCandle(CHART_ANCHOR)],
   });
   vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
 });
@@ -46,14 +70,17 @@ describe('romaco_draw_pattern', () => {
       expect(res.text).toMatch(/Drew head_shoulders/);
 
       // Atomic family replace is the FIRST bridge action.
-      expect(allActions()[0]).toMatchObject({ action: 'removeDrawingsByGroup', groupId: 'romaco-pattern-hs' });
+      expect(allActions()[0]).toMatchObject({
+        action: 'replaceAgentDrawingGroup',
+        groupId: 'romaco-mcp/pattern/hs',
+      });
 
       const draws = drawDrawings();
       expect(draws.some((d) => d.drawingType === 'trendline')).toBe(true); // neckline
       expect(draws.some((d) => d.drawingType === 'path')).toBe(true); // silhouette
       expect(draws.some((d) => d.label === 'head_shoulders target')).toBe(true);
       expect(draws.some((d) => d.label === 'head_shoulders invalidation')).toBe(true);
-      expect(draws.every((d) => d.groupId === 'romaco-pattern-hs')).toBe(true);
+      expect(draws.every((d) => d.groupId === 'romaco-mcp/pattern/hs')).toBe(true);
 
       // Unit sniff: every drawn timestamp is the pattern's session-second ts ×1000.
       for (const d of draws) {
@@ -63,8 +90,15 @@ describe('romaco_draw_pattern', () => {
         }
       }
 
-      // Journaled for replay (reconcile + localStorage rehydration).
-      expect(chartState.snapshot().drawings.length).toBe(draws.length);
+      // Journaled as one atomic desired-state command for reconnect replay.
+      const journal = chartState.snapshot();
+      expect(journal.drawings).toHaveLength(0);
+      expect(journal.drawingGroups).toHaveLength(1);
+      expect(journal.drawingGroups[0].action).toMatchObject({
+        action: 'replaceAgentDrawingGroup',
+        groupId: 'romaco-mcp/pattern/hs',
+        drawings: expect.arrayContaining(draws.map(({ action: _action, groupId: _groupId, ...drawing }) => drawing)),
+      });
     } finally {
       await close();
     }
@@ -75,9 +109,10 @@ describe('romaco_draw_pattern', () => {
     const { callTool, close } = await createTestClient();
     try {
       await callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
-      const afterFirst = chartState.snapshot().drawings.length;
+      const afterFirst = chartState.snapshot().drawingGroups.length;
       await callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
-      expect(chartState.snapshot().drawings.length).toBe(afterFirst);
+      expect(afterFirst).toBe(1);
+      expect(chartState.snapshot().drawingGroups.length).toBe(1);
     } finally {
       await close();
     }
@@ -101,7 +136,8 @@ describe('romaco_draw_pattern', () => {
     loadSession(headShouldersCandles(), 'AAPL');
     vi.mocked(bridge.getContext).mockResolvedValue({
       symbol: 'NVDA',
-      visibleCandles: [{ timestamp: CHART_ANCHOR }],
+      resolution: '1h',
+      visibleCandles: [chartCandle(CHART_ANCHOR)],
     });
     const { callTool, close } = await createTestClient();
     try {
@@ -110,6 +146,40 @@ describe('romaco_draw_pattern', () => {
       expect(res.text).toMatch(/NVDA.*AAPL|chart shows/i);
       expect(drawDrawings()).toHaveLength(0);
     } finally {
+      await close();
+    }
+  });
+
+  it('never pairs captured AAPL geometry with a later concurrent TSLA session', async () => {
+    loadSession(headShouldersCandles(), 'AAPL');
+    let releaseContext!: () => void;
+    let contextRequested!: () => void;
+    const requested = new Promise<void>((resolve) => { contextRequested = resolve; });
+    const release = new Promise<void>((resolve) => { releaseContext = resolve; });
+    vi.mocked(bridge.getContext).mockImplementationOnce(async () => {
+      contextRequested();
+      await release;
+      return {
+        symbol: 'TSLA',
+        resolution: '1h',
+        visibleCandles: [chartCandle(CHART_ANCHOR)],
+      };
+    });
+
+    const { callTool, close } = await createTestClient();
+    try {
+      const drawing = callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
+      await requested;
+      loadSession(headShouldersCandles(), 'TSLA');
+      releaseContext();
+
+      const result = await drawing;
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(/TSLA.*AAPL|chart shows/i);
+      expect(allActions()).toHaveLength(0);
+      expect(chartState.snapshot().drawingGroups).toHaveLength(0);
+    } finally {
+      releaseContext();
       await close();
     }
   });
@@ -141,9 +211,10 @@ describe('romaco_draw_pattern', () => {
     loadSession(headShouldersCandles()); // target ≈ 70, below the fixture's lows
     vi.mocked(bridge.getContext).mockResolvedValue({
       symbol: 'TEST',
+      resolution: '1h',
       visibleCandles: [
-        { timestamp: CHART_ANCHOR - 86_400_000, low: 90, high: 131 },
-        { timestamp: CHART_ANCHOR, low: 92, high: 130 },
+        chartCandle(CHART_ANCHOR - 86_400_000, 90, 131),
+        chartCandle(CHART_ANCHOR, 92, 130),
       ],
     });
     const { callTool, close } = await createTestClient();
@@ -199,6 +270,44 @@ describe('romaco_draw_pattern', () => {
       expect(chartState.snapshot().drawings).toHaveLength(0);
     } finally {
       await close();
+    }
+  });
+
+  it('fails closed when a ChartPort returns success:false instead of throwing', async () => {
+    loadSession(headShouldersCandles());
+    const identity = { chartId: createChartId('typed-port'), symbol: 'TEST', timeframe: '1h' as const };
+    const chart: ChartPort = {
+      isConnected: () => true,
+      getIdentity: async () => identity,
+      getContext: async () => ({
+        identity,
+        visibleCandles: [chartCandle(CHART_ANCHOR - 86_400_000), chartCandle(CHART_ANCHOR)],
+      }),
+      execute: async () => ({ success: true }),
+      replaceDrawingGroup: async () => ({ success: false, error: 'host policy denied' }),
+      captureSnapshot: async (format) => ({ format, dataUrl: '' }),
+    };
+    const server = new McpServer({ name: 'draw-pattern-port-test', version: '0.0.0' });
+    registerDrawPattern(server, chart);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test', version: '0.0.0' }, { capabilities: {} });
+    await client.connect(clientTransport);
+    try {
+      const result = await client.callTool({
+        name: 'romaco_draw_pattern',
+        arguments: { kind: 'head_shoulders' },
+      });
+      const text = (result.content as Array<{ type: string; text?: string }>)
+        .filter((block) => block.type === 'text')
+        .map((block) => block.text ?? '')
+        .join('\n');
+      expect(result.isError).toBe(true);
+      expect(text).toContain('host policy denied');
+      expect(chartState.snapshot().drawingGroups).toHaveLength(0);
+    } finally {
+      await client.close();
+      await server.close();
     }
   });
 });

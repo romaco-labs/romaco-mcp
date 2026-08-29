@@ -1,0 +1,103 @@
+import { analyzeSession } from '../../compression/analyze.js';
+import type { TradeThesis } from '../../compression/thesis.js';
+import { createAnalysisId, type AnalysisProvider, type AnalysisRecord } from '../../domain/analysis/model.js';
+import { validateTradeThesis } from '../../domain/analysis/validateTradeThesis.js';
+import { createDatasetId, normalizeSymbol, type DatasetRecord } from '../../domain/dataset/model.js';
+import type { ActiveDatasetSource } from '../ports/activeDatasetSource.js';
+import type { ActiveSessionActivationPort } from '../ports/activeSessionActivation.js';
+import type { AnalysisRepository } from '../ports/analysisRepository.js';
+import type { DatasetRepository } from '../ports/datasetRepository.js';
+
+export class ResolveThesisArtifactUseCase {
+  constructor(
+    private readonly datasets: DatasetRepository,
+    private readonly analyses: AnalysisRepository,
+    private readonly legacySource: ActiveDatasetSource,
+    private readonly activation: ActiveSessionActivationPort,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async resolve(analysisId?: string): Promise<AnalysisRecord> {
+    if (analysisId) {
+      const artifact = await this.analyses.get(createAnalysisId(analysisId));
+      if (!artifact) throw new Error(`Analysis ${analysisId} not found.`);
+      const dataset = await this.datasets.get(artifact.datasetId);
+      if (!dataset) throw new Error(`Dataset ${artifact.datasetId} not found.`);
+      // Explicit handles are correlation-safe and must not depend on or mutate
+      // process-global active state. Active lookup remains legacy fallback only.
+      return artifact;
+    }
+    const dataset = await this.requireActiveDataset();
+    const active = await this.analyses.getActive();
+    if (active?.datasetId === dataset.datasetId) return active;
+    const latest = await this.analyses.latestFor(dataset.datasetId);
+    if (latest) {
+      await this.activation.activateAnalysisIfCurrent(dataset, latest);
+      return latest;
+    }
+    const analysis = analyzeSession([...dataset.candles]);
+    return this.save(dataset, 'local', analysis.thesis, true);
+  }
+
+  /** Resolve one exact dataset without reading or mutating process-global active state. */
+  async resolveForDataset(datasetId: string): Promise<AnalysisRecord> {
+    const dataset = await this.datasets.get(createDatasetId(datasetId));
+    if (!dataset) throw new Error(`Dataset ${datasetId} not found.`);
+    const latest = await this.analyses.latestFor(dataset.datasetId);
+    if (latest) return latest;
+    const analysis = analyzeSession([...dataset.candles]);
+    return this.save(dataset, 'local', analysis.thesis, false);
+  }
+
+  async findExisting(provider?: AnalysisProvider): Promise<AnalysisRecord | null> {
+    const dataset = await this.requireActiveDataset();
+    const artifact = await this.analyses.latestFor(dataset.datasetId);
+    return artifact && (!provider || artifact.provider === provider) ? artifact : null;
+  }
+
+  async storeGatewayThesis(value: unknown): Promise<AnalysisRecord> {
+    const dataset = await this.requireActiveDataset();
+    const thesis = validateTradeThesis(value);
+    const existing = await this.analyses.latestFor(dataset.datasetId);
+    if (existing?.provider === 'gateway' && JSON.stringify(existing.thesis) === JSON.stringify(thesis)) {
+      await this.activation.activateAnalysisIfCurrent(dataset, existing);
+      return existing;
+    }
+    return this.save(dataset, 'gateway', thesis, true);
+  }
+
+  private async save(
+    dataset: DatasetRecord,
+    provider: AnalysisProvider,
+    thesis: TradeThesis,
+    activate: boolean,
+  ): Promise<AnalysisRecord> {
+    const local = analyzeSession([...dataset.candles]);
+    const artifact = await this.analyses.save({
+      datasetId: dataset.datasetId,
+      provider,
+      summary: local.summary,
+      thesis,
+      schemaVersion: 'thesis-v1',
+      createdAt: this.now(),
+    });
+    if (activate) await this.activation.activateAnalysisIfCurrent(dataset, artifact);
+    return artifact;
+  }
+
+  private async requireActiveDataset(): Promise<DatasetRecord> {
+    const active = await this.datasets.getActive();
+    if (active) return active;
+    const legacy = this.legacySource.read();
+    if (!legacy) {
+      throw new Error('No candle data loaded. Call romaco_load_candles first with source, symbol, and timeframe.');
+    }
+    const record = await this.datasets.save({
+      ...legacy,
+      symbol: normalizeSymbol(legacy.symbol),
+      candles: [...legacy.candles],
+    });
+    await this.activation.activateDataset(record);
+    return record;
+  }
+}

@@ -1,99 +1,151 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-/**
- * Tests for romaco_calculate_position_size logic.
- * We test the math directly by importing the calculation helpers.
- * The MCP tool itself is a thin wrapper — bridge/server integration tested separately.
- */
-
-// Helper that mimics exactly what the tool computes
-function calcPositionSize(
-  accountSize: number,
-  riskPct: number,
-  entryPrice: number,
-  stopLoss: number,
-  targetPrice?: number,
-  commissionPerSide = 0,
-) {
-  const dollarRisk = accountSize * (riskPct / 100);
-  const stopDistance = Math.abs(entryPrice - stopLoss);
-  const side = entryPrice > stopLoss ? 'long' : 'short';
-  const shares = Math.floor(dollarRisk / stopDistance);
-  const positionValue = shares * entryPrice;
-  const actualRisk = shares * stopDistance + commissionPerSide * 2;
-
-  const base = { side, shares, positionValue, actualRisk, dollarRisk, stopDistance };
-
-  if (targetPrice !== undefined) {
-    const rewardDistance = Math.abs(targetPrice - entryPrice);
-    const riskReward = rewardDistance / stopDistance;
-    const potentialProfit = shares * rewardDistance - commissionPerSide * 2;
-    const breakeven = (1 / (1 + riskReward)) * 100;
-    return { ...base, riskReward, potentialProfit, breakeven };
-  }
-
-  return base;
-}
+import { describe, expect, it } from 'vitest';
+import {
+  calculatePositionSize,
+  PositionSizeError,
+} from '../../src/domain/risk/calculatePositionSize.js';
+import { CalculatePositionSizeUseCase } from '../../src/application/use-cases/calculatePositionSize.js';
 
 describe('position size calculation', () => {
-  it('basic long: $10k account, 1% risk, $150 entry, $147 stop', () => {
-    const r = calcPositionSize(10_000, 1, 150, 147);
-    expect(r.side).toBe('long');
-    expect(r.dollarRisk).toBe(100);
-    expect(r.stopDistance).toBe(3);
-    expect(r.shares).toBe(33);              // floor(100/3) = 33
-    expect(r.positionValue).toBe(33 * 150); // 4950
+  it('sizes a basic long position', () => {
+    const result = calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 150,
+      stopLoss: 147,
+    });
+
+    expect(result).toMatchObject({
+      side: 'long',
+      maxDollarRisk: 100,
+      stopDistance: 3,
+      shares: 33,
+      positionValue: 4_950,
+      actualDollarRisk: 99,
+    });
   });
 
-  it('short: entry below stop loss', () => {
-    const r = calcPositionSize(10_000, 1, 100, 103);
-    expect(r.side).toBe('short');
-    expect(r.stopDistance).toBeCloseTo(3);
+  it('infers short side when stop is above entry', () => {
+    const result = calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 103,
+    });
+    expect(result.side).toBe('short');
   });
 
-  it('actualRisk <= dollarRisk (floor prevents overshoot)', () => {
-    const r = calcPositionSize(10_000, 1, 150, 147);
-    expect(r.actualRisk).toBeLessThanOrEqual(r.dollarRisk);
+  it('reserves round-trip commission before calculating shares', () => {
+    const result = calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 97,
+      targetPrice: 109,
+      commissionPerSide: 5,
+    });
+
+    expect(result.shares).toBe(30); // floor(($100 - $10 commission) / $3)
+    expect(result.actualDollarRisk).toBe(100);
+    expect(result.actualDollarRisk).toBeLessThanOrEqual(result.maxDollarRisk);
+    expect(result.potentialProfit).toBe(260);
+    expect(result.riskRewardRatio).toBe(3);
+    expect(result.grossRiskRewardRatio).toBe(3);
+    expect(result.netRiskRewardRatio).toBeCloseTo(2.6);
+    expect(result.breakevenWinratePct).toBeCloseTo(25);
+    expect(result.netBreakevenWinratePct).toBeCloseTo(27.78, 1);
   });
 
-  it('risk/reward ratio computed correctly', () => {
-    const r = calcPositionSize(10_000, 1, 100, 97, 109);
-    // stop distance = 3, reward distance = 9 → R/R = 3
-    expect((r as { riskReward: number }).riskReward).toBeCloseTo(3);
+  it('returns zero units without phantom commission when commission consumes risk budget', () => {
+    const result = calculatePositionSize({
+      accountSize: 1_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 99,
+      targetPrice: 102,
+      commissionPerSide: 5,
+    });
+
+    expect(result.shares).toBe(0);
+    expect(result.actualDollarRisk).toBe(0);
+    expect(result.potentialProfit).toBe(0);
+    expect(result.netRiskRewardRatio).toBeNull();
+    expect(result.netBreakevenWinratePct).toBeNull();
   });
 
-  it('breakeven win rate for 1:1 R/R is 50%', () => {
-    const r = calcPositionSize(10_000, 1, 100, 97, 103) as { breakeven: number };
-    expect(r.breakeven).toBeCloseTo(50, 0);
+  it('rejects a long target on or below entry', () => {
+    const calculate = () => calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 97,
+      targetPrice: 95,
+    });
+    expect(calculate).toThrowError(PositionSizeError);
+    expect(calculate).toThrow(/above entryPrice/);
   });
 
-  it('breakeven win rate for 2:1 R/R is ~33.3%', () => {
-    const r = calcPositionSize(10_000, 1, 100, 97, 106) as { breakeven: number };
-    expect(r.breakeven).toBeCloseTo(33.33, 0);
+  it('rejects a short target on or above entry', () => {
+    expect(() => calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 103,
+      targetPrice: 105,
+    })).toThrow(/below entryPrice/);
   });
 
-  it('commission reduces net profit', () => {
-    const withComm = calcPositionSize(10_000, 1, 100, 97, 110, 5) as { potentialProfit: number };
-    const noComm = calcPositionSize(10_000, 1, 100, 97, 110, 0) as { potentialProfit: number };
-    expect(withComm.potentialProfit).toBeLessThan(noComm.potentialProfit);
-    expect(noComm.potentialProfit - withComm.potentialProfit).toBeCloseTo(10); // 2 * commission
+  it('calculates gross reward/risk and breakeven rate', () => {
+    const result = calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 97,
+      targetPrice: 106,
+    });
+    expect(result.riskRewardRatio).toBeCloseTo(2);
+    expect(result.grossRiskRewardRatio).toBeCloseTo(2);
+    expect(result.netRiskRewardRatio).toBeCloseTo(2);
+    expect(result.breakevenWinratePct).toBeCloseTo(33.33, 1);
+    expect(result.netBreakevenWinratePct).toBeCloseTo(33.33, 1);
   });
 
-  it('zero shares when risk too small for stop distance', () => {
-    // $1 risk, $100 stop distance → 0 shares
-    const r = calcPositionSize(1_000, 0.1, 100, 0);
-    expect(r.shares).toBe(0);
+  it('returns zero shares when risk is smaller than stop distance', () => {
+    const result = calculatePositionSize({
+      accountSize: 1_000,
+      riskPct: 0.1,
+      entryPrice: 101,
+      stopLoss: 1,
+    });
+    expect(result.shares).toBe(0);
+    expect(result.actualDollarRisk).toBe(0);
   });
 
-  it('higher risk pct → more shares', () => {
-    const low = calcPositionSize(10_000, 0.5, 100, 98);
-    const high = calcPositionSize(10_000, 2, 100, 98);
-    expect(high.shares).toBeGreaterThan(low.shares);
+  it('rejects equal entry and stop', () => {
+    expect(() => calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 100,
+    })).toThrow(/cannot be the same/);
   });
 
-  it('tighter stop → more shares for same risk amount', () => {
-    const wide = calcPositionSize(10_000, 1, 100, 90);   // $10 stop
-    const tight = calcPositionSize(10_000, 1, 100, 99);  // $1 stop
-    expect(tight.shares).toBeGreaterThan(wide.shares);
+  it('aligns direct domain risk limits with the MCP maximum', () => {
+    expect(() => calculatePositionSize({
+      accountSize: 10_000,
+      riskPct: 10.1,
+      entryPrice: 100,
+      stopLoss: 99,
+    })).toThrow(/no greater than 10/);
+  });
+
+  it('is exposed through a transport-neutral application use case', () => {
+    const useCase = new CalculatePositionSizeUseCase();
+    const result = useCase.execute({
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 98,
+    });
+    expect(result.shares).toBe(50);
   });
 });

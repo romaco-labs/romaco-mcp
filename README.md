@@ -6,22 +6,26 @@ MCP server for [romaco-charts](https://www.npmjs.com/package/romaco-charts). Con
 npx @romaco/mcp
 ```
 
-![romaco-mcp — an AI agent draws technical analysis on a live chart, grounded in deterministic math (not a hallucinated number in sight)](docs/demo.gif)
+![romaco-mcp — an AI agent draws code-computed technical analysis on a live chart](docs/demo.gif)
 
 ---
 
 ## Philosophy
 
-Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Every tool's typical output is under **2 KB**. Raw payloads (full chart state, snapshots, all-bar indicator series) exist but are **gated** behind `acknowledgeHighTokenCost: true` — the agent must consciously opt in and the user must explicitly request raw data.
+Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Most default tool payloads stay under **2 KB**; `romaco_analyze_market` is the deliberate exception at **2.4–4.1 KB** across the eight recorded 400-bar fixtures. Large payloads such as snapshots, visible-candle arrays, and all-bar indicator series are **gated** behind `acknowledgeHighTokenCost: true`. Full raw chart-state export is disabled until an explicitly authorized host contract exists.
 
-The rule: *the agent never computes, it always queries*. An agent reasoning over computed features can't invent the numbers underneath its analysis — it reads the RSI, the levels, the last price from code, not from its imagination. It still *interprets* them, so the thesis can still be wrong: grounding the data is not the same as grounding the conclusion. But an agent given a 70 KB raw OHLCV dump will burn its context window before it can finish a thought — and invent half the numbers on the way.
+The rule: *code computes; the agent queries and interprets*. RSI, levels, and last
+price come from structured tool output. This reduces unsupported numeric claims;
+it cannot prevent an agent from misquoting evidence or reaching a wrong thesis.
+Grounding data is not grounding the conclusion. Compression also preserves more
+context than returning a large raw OHLCV dump by default.
 
 ### Cost table
 
 | Tool | Default | Gated raw (with `acknowledgeHighTokenCost:true`) |
 |---|---|---|
-| `romaco_analyze_market` | ~3–5 KB compressed MarketSummary | — |
-| `romaco_thesis` | <2 KB computed bull/bear debate + verdict + setup | enhanced server-side thesis (Pro) |
+| `romaco_analyze_market` | 2.4–4.1 KB on recorded 400-bar fixtures | — |
+| `romaco_thesis` | <2 KB computed bull/bear debate + verdict + setup | — |
 | `romaco_find_levels` | <500 B | — |
 | `romaco_detect_patterns` | <2 KB (trimmed hits) | full hits with anchor `points[]` |
 | `romaco_setup_chart` | <5 KB (setup log + summary) | — |
@@ -29,11 +33,12 @@ The rule: *the agent never computes, it always queries*. An agent reasoning over
 | `romaco_calculate_position_size` | <1 KB | — |
 | `romaco_list_templates` | ~4.5 KB static catalog | — |
 | `romaco_list_panes` | <1 KB | — |
-| `romaco_get_chart_context` | ~1 KB snapshot | ~80 KB full payload |
+| `romaco_get_chart_context` | ~1 KB snapshot | disabled; returns `ACTION_DENIED` |
 | `romaco_get_visible_candles` | <1 KB range summary | ~70 KB raw OHLCV |
 | `romaco_get_indicator_values` | <500 B last/prev/delta/state | ~10 KB per-bar series |
 | `romaco_capture_snapshot` | error (must ack) | 300–800 KB base64 image |
-| `romaco_add_*`, `romaco_set_*`, `romaco_clear_*`, `romaco_go_to_*`, `romaco_open_paper_position` | <100 B ack messages | — |
+| `romaco_clear_drawings`, `romaco_open_paper_position` | <2 KB structured preview/challenge or receipt | — |
+| Other `romaco_add_*`, `romaco_set_*`, `romaco_clear_*`, `romaco_go_to_*` | <1 KB structured result or ack | — |
 
 ## 30-second start
 
@@ -51,7 +56,7 @@ Then start Claude Code and prompt:
 
 > Use `romaco_setup_chart` to analyze AAPL daily with the `trend_analysis` preset.
 
-That's it. The MCP server fetches yfinance data (with disk cache + cookie/crumb handshake), runs full technical analysis, and returns a compressed MarketSummary (~500 tokens) to Claude. No 429s, no manual auth.
+That's it. The MCP server fetches yfinance data (with disk cache + cookie/crumb handshake), runs full technical analysis, and returns a compressed MarketSummary. No API key required; the cache reduces repeated upstream requests, but Yahoo can still rate-limit traffic and the server reports that failure explicitly.
 
 ### Live chart control (optional)
 
@@ -63,16 +68,17 @@ import { useRef } from 'react';
 
 function App() {
   const ref = useRef<TradingTerminalRef | null>(null);
+  const bridgeToken = getBridgeTokenFromRuntime();
   return (
     <>
       <TradingTerminal ref={ref} data={candles} symbol="AAPL" />
-      <McpBridge chartRef={ref} />
+      <McpBridge chartRef={ref} security={{ mode: 'paired', token: bridgeToken }} />
     </>
   );
 }
 ```
 
-See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a complete setup. With `<McpBridge />` mounted, the chart-bridge tools (`add_indicator`, `add_drawing`, `add_alert`, `capture_snapshot`, …) become available.
+See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a complete setup. With `<McpBridge />` mounted, the chart-bridge tools (`add_indicator`, `add_drawing`, `add_alert`, `capture_snapshot`, …) become available. Atomic thesis/pattern annotation additionally requires the host action documented in [Chart bridge compatibility](./docs/CHART_BRIDGE_COMPATIBILITY.md); older hosts fail closed instead of falling back to sequential drawing writes. `romaco_annotate` also uses a two-step, one-time confirmation challenge: its first call performs zero writes and returns `APPROVAL_REQUIRED`; retry only after the user approves the exact `analysisId`.
 
 ### Data cache
 
@@ -94,17 +100,19 @@ Exposes 20+ MCP tools in two categories:
 
 **Chart-bridge tools** — control a live Romaco chart in the browser:
 - `romaco_add_indicator` — EMA, RSI, MACD, Bollinger, ATR, 29+ indicators
-- `romaco_add_drawing` — trendlines, Fibonacci, horizontal lines, channels, rectangles
+- `romaco_add_drawing` — agent-owned trendlines, Fibonacci, lines, channels, rectangles; omitted group defaults to `romaco-mcp/manual`
 - `romaco_add_alert` — price alerts with direction (above/below/cross)
+- `romaco_clear_alerts` — preview, approve, then remove exact alert IDs from one chart; never sends global clear
 - `romaco_capture_snapshot` — PNG/JPEG base64 for vision LLMs
-- `romaco_open_paper_position` — simulated long/short with SL/TP
-- `romaco_get_chart_context` — complete chart state as JSON
+- `romaco_open_paper_position` — approval-gated simulated long/short with SL/TP and deterministic process-local idempotency
+- `romaco_get_chart_context` — concise live chart state; raw chart export is disabled
 - `romaco_get_visible_candles` — OHLCV in current viewport
 - `romaco_set_zoom` / `romaco_reset_view` — zoom control
-- `romaco_clear_drawings` — remove all drawings
+- `romaco_clear_drawings` — preview, approve, then remove only `romaco-mcp/*` groups; user drawings stay intact
 - `romaco_list_panes` — enumerate main + subpanel panes (e.g. RSI subpanel id)
 - `romaco_get_indicator_values` — read computed indicator series (by id or name)
 - `romaco_go_to_timestamp` — scrub viewport to a given timestamp
+- `romaco_annotate` — atomically draw one exact thesis after a scoped, one-time confirmation challenge
 
 ---
 
@@ -162,7 +170,7 @@ Load 500 candles of AAPL 1h from yfinance, then analyze the market.
 
 Claude will call:
 1. `romaco_load_candles` → fetches from Yahoo Finance
-2. `romaco_analyze_market` → returns compressed MarketSummary (~500 tokens)
+2. `romaco_analyze_market` → returns a compressed MarketSummary (2.4–4.1 KB on the recorded 400-bar fixture suite)
 3. `romaco_find_levels` → S/R zones, POC, VAH, VAL
 4. Reasons over the features → tells you what it sees
 
@@ -175,10 +183,11 @@ import { TradingTerminal, McpBridge } from 'romaco-charts/react';
 
 function App() {
   const ref = useRef(null);
+  const bridgeToken = getBridgeTokenFromRuntime();
   return (
     <>
       <TradingTerminal ref={ref} symbol="AAPL" timeframe="1h" datafeed={myDatafeed} />
-      <McpBridge chartRef={ref} />
+      <McpBridge chartRef={ref} security={{ mode: 'paired', token: bridgeToken }} />
     </>
   );
 }
@@ -189,6 +198,41 @@ Then from Claude:
 Add EMA 20 and RSI 14 to the chart, draw a Fibonacci from the last swing low to swing high,
 and capture a snapshot so I can see it.
 ```
+
+`romaco_annotate`, `romaco_clear_drawings`, `romaco_clear_alerts`, and
+`romaco_open_paper_position` use two-step confirmation. First call returns a
+scoped token and performs zero chart writes. MCP rejects missing, expired,
+wrong-scope, and replayed tokens. Agent/client must send token only after
+explicit user approval. Token proves completion of protocol; by itself it
+cannot cryptographically prove human intent and never bypasses chart host's
+`actionPolicy`.
+
+Drawing clear scope binds exact chart identity plus current Romaco-managed group
+plan. It never sends global `clearDrawings`; each reserved `romaco-mcp/*` group
+is replaced with empty desired state, leaving user and unrelated groups intact.
+
+Alert clear scope binds exact chart identity plus current stable alert IDs. It
+never sends global `clearAlerts`; each approved alert is removed by ID with host
+identity policy. Alert-plan drift consumes the token and performs zero writes.
+
+Paper positions are visual simulation only: no broker, real order, or money.
+Caller supplies stable `idempotencyKey`. Same completed key/payload returns same
+stored receipt without another chart write; changed payload gets
+`IDEMPOTENCY_CONFLICT`. Ambiguous bridge failure marks key indeterminate and
+blocks automatic retry until user inspects chart state, reconciles outcome, and
+uses a new key with fresh approval. Journal is memory-only for MCP process;
+restart/crash does not provide durable exactly-once execution.
+
+---
+
+## Evaluation status
+
+`npm run eval:offline` validates 28 declared scenarios and currently executes 24
+deterministic MCP conformance workflows; 4 remain explicitly `planned`. Reported
+success rate uses executed runnable workflows as denominator and always reports
+planned work plus concrete blockers separately. Runnable failures or missing runnable workflow/grader
+implementations exit non-zero. Numeric agent-final-answer grading remains planned;
+current `evidence-conformance` checks structured tool evidence, not model prose.
 
 ---
 
@@ -208,15 +252,40 @@ and capture a snapshot so I can see it.
 | Option | Default | How to set |
 |--------|---------|-----------|
 | WebSocket port | `7399` | `--port 3200` or `ROMACO_MCP_PORT=3200` |
-| `ROMACO_TOKEN` | _(none → free)_ | API key from [romaco.io](https://romaco.io) — unlocks Pro |
-| `ROMACO_API_URL` | `http://localhost:8000` | ROA-I backend; prod: `https://api.romaco.tech` |
-| `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + romaco.io)_ | Comma-separated origins for `<McpBridge />` pages on other domains |
+| `ROMACO_MCP_BRIDGE_AUTH` | `auto` | `auto`, `required`, or explicit `legacy` compatibility mode |
+| `ROMACO_MCP_BRIDGE_TOKEN` | _(none)_ | Canonical base64url encoding of exactly 32 random bytes |
+| `ROMACO_TOKEN` | _(empty)_ | Reserved. Does not authorize or trigger candle egress today. |
+| `ROMACO_API_URL` | _(unused)_ | Reserved for a future explicitly authorized remote-adapter contract. |
+| `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + `https://romaco.io`)_ | Comma-separated exact HTTP(S) origins for `<McpBridge />` pages on other domains |
+| `ROMACO_MCP_TELEMETRY` | _(off)_ | Set exactly `jsonl` for redacted local tool telemetry on stderr. Never sends telemetry over network. |
 
-**Bridge security**: the WebSocket bridge binds to `127.0.0.1` only (never network-visible) and rejects browser connections from unknown origins — a malicious webpage in your browser can't reach the chart. If your app embeds `<McpBridge />` on its own domain, allow it explicitly:
+**Bridge security**: paired v2 mutually authenticates server and browser with
+HMAC-SHA-256 before chart traffic. Token never crosses WebSocket. Generate one
+once, configure MCP process, inject same value into `<McpBridge />` at runtime:
 
 ```bash
-ROMACO_MCP_ALLOWED_ORIGINS="https://myapp.com" npx @romaco/mcp
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+
+ROMACO_MCP_BRIDGE_AUTH=required \
+ROMACO_MCP_BRIDGE_TOKEN="<generated-token>" \
+ROMACO_MCP_ALLOWED_ORIGINS="https://myapp.com" \
+npx @romaco/mcp
 ```
+
+Never put token in source, public bundle, URL, logs, or browser storage. Use
+in-memory input for current page lifetime. `auto` selects paired v2 with valid
+token; no token keeps legacy v1 with warning. Malformed configured token
+disables only chart bridge. `required` never falls back to v1.
+
+Legacy compatibility is unauthenticated and is not secure by default. Production
+deployments should use `required` plus paired `McpBridge`; enable legacy only as
+an explicit migration step.
+
+Listener binds `127.0.0.1`; exact origins add defense in depth. In paired mode,
+localhost pages still need pairing token. Browser-to-server frames above 8 MiB
+are rejected before JSON parsing, leaving more than 10x headroom over typical
+documented chart snapshots. Frames are not encrypted. Never expose listener
+remotely; use authenticated TLS gateway for non-loopback deployments.
 
 ```bash
 # Custom port
@@ -230,22 +299,17 @@ Set the same port in `<McpBridge port={3200} />`.
 
 ---
 
-## Free vs Pro (ROA-I)
+## Local execution and remote egress
 
-This MCP is the **free hook**. It runs fully standalone — analysis is computed
-locally and limited by whatever model your agent uses.
+Current tools compute analysis locally in `src/compression`. Setting
+`ROMACO_TOKEN` or `ROMACO_API_URL` does **not** authorize transmission of candles
+to a remote analysis service. When a token is present, `romaco_thesis` returns a
+structured `REMOTE_EGRESS_DISABLED` warning and uses the local artifact unless an
+already validated gateway artifact was injected through an authorized host path.
 
-| | Free | Pro (`ROMACO_TOKEN`) |
-|---|------|----------------------|
-| Data | `yfinance` / `raw` | same |
-| Analysis | computed locally (`src/compression`) | delegated to **ROA-I** in the backend |
-| Tools | the tools listed here | + ROA-I's exclusive backend tools (deep math, reasoning agent) |
-
-With a `ROMACO_TOKEN` set, analysis tools (starting with `romaco_analyze_market`)
-forward the heavy compute to ROA-I at `ROMACO_API_URL`. No token, or backend
-unreachable → it falls back to local compute, so the free path never breaks.
-
-Get a key at [romaco.io](https://romaco.io). See `.env.example`.
+A future remote adapter must add explicit authorization, validated boundary
+schemas, transport security, trace propagation, and user-facing egress docs
+before it can become callable. No automatic network fallback exists today.
 
 ---
 
@@ -264,7 +328,7 @@ Get a key at [romaco.io](https://romaco.io). See `.env.example`.
 
 ## Requirements
 
-- Node.js >= 18
+- Node.js >= 20
 - For chart-bridge tools: romaco-charts >= 1.0.0-beta.6 with `<McpBridge />` in your app
 
 ---
@@ -272,5 +336,6 @@ Get a key at [romaco.io](https://romaco.io). See `.env.example`.
 ## Links
 
 - [romaco-charts npm](https://www.npmjs.com/package/romaco-charts)
-- [Documentation](https://romaco.io)
+- [Documentation](./docs/INSTALL.md)
+- [romaco.io](https://www.romaco.io)
 - [GitHub](https://github.com/romaco-labs/romaco-mcp)
