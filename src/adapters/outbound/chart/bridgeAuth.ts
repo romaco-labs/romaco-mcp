@@ -51,9 +51,10 @@ export function verifyBridgeProof(
   proof: unknown,
 ): boolean {
   if (typeof proof !== 'string') return false;
-  const actual = Buffer.from(proof, 'base64url');
+  const actual = decodeCanonicalBase64Url(proof, 32);
+  if (!actual) return false;
   const expected = Buffer.from(createBridgeProof(token, role, clientNonce, serverNonce), 'base64url');
-  return actual.byteLength === expected.byteLength && timingSafeEqual(actual, expected);
+  return timingSafeEqual(actual, expected);
 }
 
 export class NonceReplayCache {

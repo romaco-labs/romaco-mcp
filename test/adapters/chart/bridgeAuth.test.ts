@@ -28,6 +28,8 @@ describe('bridge auth v2', () => {
     const serverProof = createBridgeProof(token, 'server', CLIENT_NONCE, SERVER_NONCE);
     expect(verifyBridgeProof(token, 'server', CLIENT_NONCE, SERVER_NONCE, serverProof)).toBe(true);
     expect(verifyBridgeProof(token, 'client', CLIENT_NONCE, SERVER_NONCE, serverProof)).toBe(false);
+    expect(verifyBridgeProof(token, 'server', CLIENT_NONCE, SERVER_NONCE, `${serverProof}=`)).toBe(false);
+    expect(verifyBridgeProof(token, 'server', CLIENT_NONCE, SERVER_NONCE, 'x'.repeat(100_000))).toBe(false);
   });
 
   it('requires canonical 32-byte base64url tokens and nonces', () => {
