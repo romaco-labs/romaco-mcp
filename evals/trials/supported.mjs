@@ -435,12 +435,12 @@ async function s02() {
         indicatorType: 'RSI', params: [14],
       });
       const originalId = structured(added).data.indicator.indicatorId;
-      const refreshedId = 'indicator_reconnected';
-      chart.indicators = [{ id: refreshedId, name: 'RSI', type: 'RSI', params: [14] }];
+      chart.indicators = [];
       const writesBeforeRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
       const refreshed = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
       const writesAfterRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
       const desiredAfterRefresh = journal.snapshot();
+      const refreshedId = desiredAfterRefresh.indicators[0]?.resourceIds?.[0];
       const removed = await harness.callTool('romaco_remove_indicator', { indicatorId: refreshedId });
       const writesAfterRemove = chart.calls.filter((call) => call.operation === 'execute').length;
       const finalReconnect = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
@@ -471,12 +471,12 @@ async function s03() {
     execute: async ({ harness, chart, runtime, journal }) => {
       const added = await harness.callTool('romaco_add_alert', { price, direction: 'above' });
       const originalId = structured(added).data.alert.alertId;
-      const refreshedId = 'alert_reconnected';
-      chart.alerts = [{ id: refreshedId, price, direction: 'above' }];
+      chart.alerts = [];
       const writesBeforeRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
       const refreshed = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
       const writesAfterRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
       const desiredAfterRefresh = journal.snapshot();
+      const refreshedId = desiredAfterRefresh.alerts[0]?.resourceIds?.[0];
       const removed = await harness.callTool('romaco_remove_alert', { alertId: refreshedId });
       const writesAfterRemove = chart.calls.filter((call) => call.operation === 'execute').length;
       const finalReconnect = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });

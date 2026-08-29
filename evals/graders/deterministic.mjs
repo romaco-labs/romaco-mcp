@@ -120,6 +120,7 @@ function identityGrader(task, trial) {
     const removed = structured(trial.facts.removed).data;
     if (
       refreshed?.resourceIds?.[0] !== trial.facts.refreshedId
+      || trial.facts.refreshedId === trial.facts.originalId
       || removed.indicatorId !== trial.facts.refreshedId
       || removed.type !== 'RSI'
     ) {
@@ -131,6 +132,7 @@ function identityGrader(task, trial) {
     const removed = structured(trial.facts.removed).data;
     if (
       refreshed?.resourceIds?.[0] !== trial.facts.refreshedId
+      || trial.facts.refreshedId === trial.facts.originalId
       || removed.alertId !== trial.facts.refreshedId
       || removed.direction !== 'above'
     ) {
@@ -279,9 +281,9 @@ function terminalStateGrader(task, trial) {
   }
   if (task.id === 'S02_removed_indicator_stays_removed') {
     if (
-      trial.facts.refreshed.applied !== 0
-      || trial.facts.writesAfterRefresh !== trial.facts.writesBeforeRefresh
-      || trial.facts.writesAfterRemove !== trial.facts.writesBeforeRefresh + 1
+      trial.facts.refreshed.applied !== 1
+      || trial.facts.writesAfterRefresh !== trial.facts.writesBeforeRefresh + 1
+      || trial.facts.writesAfterRemove !== trial.facts.writesBeforeRefresh + 2
       || trial.facts.finalReconnect.status !== 'empty'
       || trial.facts.writesAfterFinalReconnect !== trial.facts.writesAfterRemove
       || trial.facts.finalDesired.indicators.length !== 0
@@ -292,9 +294,9 @@ function terminalStateGrader(task, trial) {
   }
   if (task.id === 'S03_removed_alert_stays_removed') {
     if (
-      trial.facts.refreshed.applied !== 0
-      || trial.facts.writesAfterRefresh !== trial.facts.writesBeforeRefresh
-      || trial.facts.writesAfterRemove !== trial.facts.writesBeforeRefresh + 1
+      trial.facts.refreshed.applied !== 1
+      || trial.facts.writesAfterRefresh !== trial.facts.writesBeforeRefresh + 1
+      || trial.facts.writesAfterRemove !== trial.facts.writesBeforeRefresh + 2
       || trial.facts.finalReconnect.status !== 'empty'
       || trial.facts.writesAfterFinalReconnect !== trial.facts.writesAfterRemove
       || trial.facts.finalDesired.alerts.length !== 0

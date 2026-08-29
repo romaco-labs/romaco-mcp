@@ -79,6 +79,12 @@ class EvalChartJournal {
     this.alerts = [];
     this.groups = new Map();
     this.revision = 0;
+    this.nextEntry = 0;
+  }
+
+  allocateEntryId(kind) {
+    this.nextEntry += 1;
+    return `${kind}_${this.nextEntry}`;
   }
 
   sameIdentity(left, right) {
@@ -89,17 +95,35 @@ class EvalChartJournal {
   }
 
   recordIndicator(indicator, identity, resourceId) {
-    this.indicators.push({ indicator: structuredClone(indicator), identity: structuredClone(identity), resourceId });
+    this.indicators.push({
+      entryId: this.allocateEntryId('indicator'),
+      entryVersion: 1,
+      indicator: structuredClone(indicator),
+      identity: structuredClone(identity),
+      resourceId,
+    });
     this.revision += 1;
   }
 
   recordDrawing(drawing, identity, resourceId) {
-    this.drawings.push({ drawing: structuredClone(drawing), identity: structuredClone(identity), resourceId });
+    this.drawings.push({
+      entryId: this.allocateEntryId('drawing'),
+      entryVersion: 1,
+      drawing: structuredClone(drawing),
+      identity: structuredClone(identity),
+      resourceId,
+    });
     this.revision += 1;
   }
 
   recordAlert(alert, identity, resourceId) {
-    this.alerts.push({ alert: structuredClone(alert), identity: structuredClone(identity), resourceId });
+    this.alerts.push({
+      entryId: this.allocateEntryId('alert'),
+      entryVersion: 1,
+      alert: structuredClone(alert),
+      identity: structuredClone(identity),
+      resourceId,
+    });
     this.revision += 1;
   }
 
@@ -136,7 +160,10 @@ class EvalChartJournal {
   }
 
   replaceDrawingGroup(groupId, drawings, identity, idempotencyKey, resourceIds) {
+    const prior = this.groups.get(groupId);
     this.groups.set(groupId, {
+      entryId: prior?.entryId ?? this.allocateEntryId('drawing-group'),
+      entryVersion: prior ? prior.entryVersion + 1 : 1,
       drawings: structuredClone(drawings),
       identity: structuredClone(identity),
       idempotencyKey,
@@ -178,16 +205,22 @@ class EvalChartJournal {
   snapshot() {
     return {
       indicators: this.indicators.map((entry) => ({
+        entryId: entry.entryId,
+        entryVersion: entry.entryVersion,
         command: { action: 'addIndicator', indicatorType: entry.indicator.type, params: entry.indicator.params },
         identity: structuredClone(entry.identity),
         resourceIds: entry.resourceId ? [entry.resourceId] : [],
       })),
       drawings: this.drawings.map((entry) => ({
+        entryId: entry.entryId,
+        entryVersion: entry.entryVersion,
         command: structuredClone(entry.drawing),
         identity: structuredClone(entry.identity),
         resourceIds: entry.resourceId ? [entry.resourceId] : [],
       })),
       drawingGroups: [...this.groups.entries()].map(([groupId, group]) => ({
+        entryId: group.entryId,
+        entryVersion: group.entryVersion,
         command: {
           groupId,
           drawings: structuredClone(group.drawings),
@@ -198,6 +231,8 @@ class EvalChartJournal {
         resourceIds: structuredClone(group.resourceIds),
       })),
       alerts: this.alerts.map((entry) => ({
+        entryId: entry.entryId,
+        entryVersion: entry.entryVersion,
         command: structuredClone(entry.alert),
         identity: structuredClone(entry.identity),
         resourceIds: entry.resourceId ? [entry.resourceId] : [],
@@ -205,36 +240,18 @@ class EvalChartJournal {
     };
   }
 
-  bindReplayedResources(command, identity, resourceIds) {
-    const resourceId = resourceIds[0];
-    if ('idempotencyKey' in command) {
-      const group = this.groups.get(command.groupId);
-      if (group && this.sameIdentity(group.identity, identity)) group.resourceIds = structuredClone(resourceIds);
-      return;
+  bindReplayedResources(entryId, entryVersion, resourceIds) {
+    const individual = [...this.indicators, ...this.drawings, ...this.alerts]
+      .find((entry) => entry.entryId === entryId);
+    if (individual) {
+      if (individual.entryVersion !== entryVersion) return false;
+      individual.resourceId = resourceIds[0];
+      return true;
     }
-    if (!resourceId) return;
-    if (command.action === 'addIndicator') {
-      const entry = this.indicators.find((candidate) =>
-        this.sameIdentity(candidate.identity, identity)
-        && candidate.indicator.type.toLowerCase() === command.indicatorType.toLowerCase()
-        && JSON.stringify(candidate.indicator.params ?? []) === JSON.stringify(command.params ?? []),
-      );
-      if (entry) entry.resourceId = resourceId;
-    } else if (command.action === 'addDrawing') {
-      const entry = this.drawings.find((candidate) =>
-        this.sameIdentity(candidate.identity, identity)
-        && candidate.drawing.drawingType === command.drawingType
-        && JSON.stringify(candidate.drawing.points) === JSON.stringify(command.points),
-      );
-      if (entry) entry.resourceId = resourceId;
-    } else if (command.action === 'addAlert') {
-      const entry = this.alerts.find((candidate) =>
-        this.sameIdentity(candidate.identity, identity)
-        && candidate.alert.price === command.price
-        && (candidate.alert.options?.direction ?? 'cross') === (command.options?.direction ?? 'cross'),
-      );
-      if (entry) entry.resourceId = resourceId;
-    }
+    const group = [...this.groups.values()].find((entry) => entry.entryId === entryId);
+    if (!group || group.entryVersion !== entryVersion) return false;
+    group.resourceIds = structuredClone(resourceIds);
+    return true;
   }
 }
 
