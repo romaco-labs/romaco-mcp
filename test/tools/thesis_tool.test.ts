@@ -99,7 +99,7 @@ describe('romaco_thesis tool', () => {
     }
   });
 
-  it('Pro path fails closed without explicit candle-egress authorization', async () => {
+  it('configured token fails closed without explicit candle-egress authorization', async () => {
     process.env.ROMACO_TOKEN = 'sk-pro';
     const deep = analyzeSession(uptrendCandles(220, 100, 0.6)).thesis;
     const fetchMock = vi.fn(async () => fakeResponse({ status: 200, json: deep }));
@@ -118,7 +118,7 @@ describe('romaco_thesis tool', () => {
     }
   });
 
-  it('Pro path never attempts network fallback implicitly', async () => {
+  it('configured token never attempts network fallback implicitly', async () => {
     process.env.ROMACO_TOKEN = 'sk-pro';
     vi.stubGlobal('fetch', vi.fn(async () => {
       throw new Error('ECONNREFUSED');
@@ -136,7 +136,7 @@ describe('romaco_thesis tool', () => {
     }
   });
 
-  it('Pro path does not transmit even an invalid token', async () => {
+  it('configured invalid token still transmits nothing', async () => {
     process.env.ROMACO_TOKEN = 'sk-bad';
     const fetchMock = vi.fn(async () => fakeResponse({ status: 401, ok: false }));
     vi.stubGlobal('fetch', fetchMock);

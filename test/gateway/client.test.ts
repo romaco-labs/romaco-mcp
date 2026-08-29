@@ -35,7 +35,7 @@ function fakeResponse(opts: { status?: number; ok?: boolean; json?: unknown; tex
   } as Response;
 }
 
-describe('isPro', () => {
+describe('legacy gateway-token predicate', () => {
   it('false when ROMACO_TOKEN unset', () => {
     expect(isPro()).toBe(false);
   });
@@ -148,7 +148,7 @@ describe('callGateway', () => {
     expect(isAuthError(err)).toBe(true);
   });
 
-  it('500 → GatewayError(status=500), NOT an auth error (caller falls back to local)', async () => {
+  it('500 → GatewayError(status=500), not an auth error', async () => {
     process.env.ROMACO_TOKEN = 'sk-ok';
     vi.stubGlobal(
       'fetch',
@@ -161,7 +161,7 @@ describe('callGateway', () => {
     expect(isAuthError(err)).toBe(false);
   });
 
-  it('network failure → GatewayError without status (caller falls back to local)', async () => {
+  it('network failure → GatewayError without status', async () => {
     process.env.ROMACO_TOKEN = 'sk-ok';
     vi.stubGlobal(
       'fetch',

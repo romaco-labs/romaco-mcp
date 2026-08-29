@@ -3,14 +3,14 @@ import type { MarketSummary, PatternHit } from './types.js';
 /**
  * Trade thesis synthesizer — the "computed bull/bear debate".
  *
- * Instead of feeding raw numbers to a model and hoping, we DERIVE the debate
- * deterministically from the already-computed MarketSummary: every bull/bear
- * point is a rule over real features, the verdict is a weighted score, and the
- * setup's R/R is arithmetic. Same decision surface, a fraction of the cost,
- * zero hallucination.
+ * We derive the debate deterministically from the already-computed
+ * MarketSummary: every bull/bear point is a rule over computed features, the
+ * verdict is a weighted score, and setup R/R is arithmetic.
  *
  * Pure function — no I/O, no LLM, reasons only over the public MarketSummary.
- * An enhanced server-side version is available in Pro.
+ * Code computes the artifact; an AI may interpret it and optionally draw it on
+ * a chart. Deterministic computation reduces unsupported numeric claims but
+ * does not eliminate interpretation risk.
  */
 
 export interface ThesisPoint {
