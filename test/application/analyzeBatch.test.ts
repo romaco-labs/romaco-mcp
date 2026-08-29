@@ -57,7 +57,7 @@ describe('AnalyzeBatchUseCase', () => {
       {
         resolveForDataset: vi.fn(async (datasetId: string) => artifacts.get(createDatasetId(datasetId))!),
       } as never,
-      { activateDataset: vi.fn(), activateAnalysis },
+      { activateDataset: vi.fn(), activateAnalysis, activateAnalysisIfCurrent: vi.fn() },
     );
 
     const result = await useCase.execute({
@@ -77,7 +77,7 @@ describe('AnalyzeBatchUseCase', () => {
     const useCase = new AnalyzeBatchUseCase(
       { loadDetached: vi.fn(async () => dataset('AAPL')) } as never,
       { resolveForDataset: vi.fn(async () => { throw new Error('analysis failed'); }) } as never,
-      { activateDataset: vi.fn(), activateAnalysis },
+      { activateDataset: vi.fn(), activateAnalysis, activateAnalysisIfCurrent: vi.fn() },
     );
 
     await expect(useCase.execute({ symbols: ['AAPL'], timeframe: '1d', lookback: 300 }))

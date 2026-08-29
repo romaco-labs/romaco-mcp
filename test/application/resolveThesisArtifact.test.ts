@@ -4,6 +4,7 @@ import { InMemoryDatasetRepository } from '../../src/adapters/outbound/persisten
 import { ResolveThesisArtifactUseCase } from '../../src/application/use-cases/resolveThesisArtifact.js';
 import { analyzeSession } from '../../src/compression/analyze.js';
 import { uptrendCandles } from '../compression/fixtures.js';
+import { SerializedActiveSessionActivation } from '../../src/application/use-cases/serializedActiveSessionActivation.js';
 
 const candles = uptrendCandles(220, 100, 0.6);
 
@@ -21,10 +22,11 @@ function fixture() {
       fetchedAt: 1,
     }),
   };
+  const activation = new SerializedActiveSessionActivation(datasets, analyses, { replace: () => {} });
   return {
     datasets,
     analyses,
-    useCase: new ResolveThesisArtifactUseCase(datasets, analyses, source, () => 123),
+    useCase: new ResolveThesisArtifactUseCase(datasets, analyses, source, activation, () => 123),
   };
 }
 

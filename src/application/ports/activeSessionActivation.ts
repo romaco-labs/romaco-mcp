@@ -5,4 +5,5 @@ import type { DatasetRecord } from '../../domain/dataset/model.js';
 export interface ActiveSessionActivationPort {
   activateDataset(dataset: DatasetRecord): Promise<void>;
   activateAnalysis(dataset: DatasetRecord, analysis: AnalysisRecord): Promise<void>;
+  activateAnalysisIfCurrent(dataset: DatasetRecord, analysis: AnalysisRecord): Promise<boolean>;
 }

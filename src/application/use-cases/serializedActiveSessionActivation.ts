@@ -27,11 +27,7 @@ export class SerializedActiveSessionActivation implements ActiveSessionActivatio
   }
 
   activateAnalysis(dataset: DatasetRecord, analysis: AnalysisRecord): Promise<void> {
-    if (analysis.datasetId !== dataset.datasetId) {
-      return Promise.reject(new Error(
-        `Analysis ${analysis.analysisId} belongs to ${analysis.datasetId}, not ${dataset.datasetId}.`,
-      ));
-    }
+    this.assertRelated(dataset, analysis);
     return this.serialize(async () => {
       await this.datasets.setActive(dataset.datasetId);
       await this.analyses.setActive(analysis.analysisId);
@@ -39,7 +35,24 @@ export class SerializedActiveSessionActivation implements ActiveSessionActivatio
     });
   }
 
-  private serialize(work: () => Promise<void>): Promise<void> {
+  activateAnalysisIfCurrent(dataset: DatasetRecord, analysis: AnalysisRecord): Promise<boolean> {
+    this.assertRelated(dataset, analysis);
+    return this.serialize(async () => {
+      const current = await this.datasets.getActive();
+      if (current?.datasetId !== dataset.datasetId) return false;
+      await this.analyses.setActive(analysis.analysisId);
+      this.projection.replace(dataset);
+      return true;
+    });
+  }
+
+  private assertRelated(dataset: DatasetRecord, analysis: AnalysisRecord): void {
+    if (analysis.datasetId !== dataset.datasetId) {
+      throw new Error(`Analysis ${analysis.analysisId} belongs to ${analysis.datasetId}, not ${dataset.datasetId}.`);
+    }
+  }
+
+  private serialize<Result>(work: () => Promise<Result>): Promise<Result> {
     const result = this.tail.then(work, work);
     this.tail = result.then(() => undefined, () => undefined);
     return result;

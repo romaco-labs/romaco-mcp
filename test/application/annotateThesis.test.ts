@@ -7,6 +7,7 @@ import type { ChartPort } from '../../src/application/ports/chart.js';
 import { analyzeSession } from '../../src/compression/analyze.js';
 import { createChartId } from '../../src/domain/chart/model.js';
 import { uptrendCandles } from '../compression/fixtures.js';
+import { SerializedActiveSessionActivation } from '../../src/application/use-cases/serializedActiveSessionActivation.js';
 
 const candles = uptrendCandles(220, 100, 0.6);
 const visibleCandles = [
@@ -22,7 +23,13 @@ async function fixture(chartOverrides: Partial<ChartPort> = {}) {
     source: 'raw', symbol: 'TEST', timeframe: '1d', candles, fetchedAt: 1,
   });
   await datasets.setActive(dataset.datasetId);
-  const resolver = new ResolveThesisArtifactUseCase(datasets, analyses, { read: () => null });
+  const activation = new SerializedActiveSessionActivation(datasets, analyses, { replace: () => {} });
+  const resolver = new ResolveThesisArtifactUseCase(
+    datasets,
+    analyses,
+    { read: () => null },
+    activation,
+  );
   const chart: ChartPort = {
     isConnected: () => true,
     getIdentity: vi.fn(),

@@ -67,6 +67,7 @@ export function createProductionRuntime(): ApplicationRuntime {
     datasets,
     analyses,
     new LegacySessionDatasetSource(),
+    activeSessionActivation,
   );
   const approvals = new InMemoryApprovalStore();
   const agentDrawingJournal = new LegacyAgentDrawingJournal();

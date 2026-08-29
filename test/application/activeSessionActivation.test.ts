@@ -4,6 +4,7 @@ import { InMemoryDatasetRepository } from '../../src/adapters/outbound/persisten
 import { AnalyzeBatchUseCase } from '../../src/application/use-cases/analyzeBatch.js';
 import { LoadDatasetUseCase } from '../../src/application/use-cases/loadDataset.js';
 import { SerializedActiveSessionActivation } from '../../src/application/use-cases/serializedActiveSessionActivation.js';
+import { ResolveThesisArtifactUseCase } from '../../src/application/use-cases/resolveThesisArtifact.js';
 import type { MarketSummary } from '../../src/compression/types.js';
 import type { TradeThesis } from '../../src/compression/thesis.js';
 
@@ -88,5 +89,58 @@ describe('SerializedActiveSessionActivation', () => {
     expect((await analyses.getActive())?.analysisId).toBe(batchResult.top.artifact.analysisId);
     expect((await analyses.getActive())?.datasetId).toBe((await datasets.getActive())?.datasetId);
     expect(projected.at(-1)).toBe(batchResult.top.dataset.symbol);
+  });
+
+  it('does not reactivate stale thesis when concurrent load changes active dataset', async () => {
+    let datasetNumber = 0;
+    let analysisNumber = 0;
+    const datasets = new InMemoryDatasetRepository(() => String(++datasetNumber));
+    const analyses = new InMemoryAnalysisRepository(() => String(++analysisNumber));
+    let projected = '';
+    const activation = new SerializedActiveSessionActivation(datasets, analyses, {
+      replace: (dataset) => { projected = dataset.symbol; },
+    });
+    const activeA = await datasets.save({
+      source: 'raw', symbol: 'AAPL', timeframe: '1d', candles, fetchedAt: 1,
+    });
+    await activation.activateDataset(activeA);
+    const loadDataset = new LoadDatasetUseCase({
+      load: vi.fn(async () => ({
+        source: 'raw' as const,
+        symbol: 'MSFT',
+        timeframe: '1d' as const,
+        candles,
+        fetchedAt: 2,
+      })),
+    }, datasets, activation);
+    const resolver = new ResolveThesisArtifactUseCase(
+      datasets,
+      analyses,
+      { read: () => null },
+      activation,
+    );
+
+    const originalSave = analyses.save.bind(analyses);
+    let analysisSaved: (() => void) | undefined;
+    let releaseAnalysis: (() => void) | undefined;
+    const saved = new Promise<void>((resolve) => { analysisSaved = resolve; });
+    const release = new Promise<void>((resolve) => { releaseAnalysis = resolve; });
+    vi.spyOn(analyses, 'save').mockImplementationOnce(async (draft) => {
+      const artifact = await originalSave(draft);
+      analysisSaved?.();
+      await release;
+      return artifact;
+    });
+
+    const staleThesis = resolver.resolve();
+    await saved;
+    const activeB = await loadDataset.execute({ source: 'raw', symbol: 'MSFT', timeframe: '1d' });
+    releaseAnalysis?.();
+    const artifactA = await staleThesis;
+
+    expect(artifactA.datasetId).toBe(activeA.datasetId);
+    expect(await datasets.getActive()).toBe(activeB);
+    expect(await analyses.getActive()).toBeNull();
+    expect(projected).toBe('MSFT');
   });
 });

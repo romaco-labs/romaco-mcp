@@ -4,6 +4,7 @@ import { createAnalysisId, type AnalysisProvider, type AnalysisRecord } from '..
 import { validateTradeThesis } from '../../domain/analysis/validateTradeThesis.js';
 import { createDatasetId, normalizeSymbol, type DatasetRecord } from '../../domain/dataset/model.js';
 import type { ActiveDatasetSource } from '../ports/activeDatasetSource.js';
+import type { ActiveSessionActivationPort } from '../ports/activeSessionActivation.js';
 import type { AnalysisRepository } from '../ports/analysisRepository.js';
 import type { DatasetRepository } from '../ports/datasetRepository.js';
 
@@ -12,6 +13,7 @@ export class ResolveThesisArtifactUseCase {
     private readonly datasets: DatasetRepository,
     private readonly analyses: AnalysisRepository,
     private readonly legacySource: ActiveDatasetSource,
+    private readonly activation: ActiveSessionActivationPort,
     private readonly now: () => number = Date.now,
   ) {}
 
@@ -30,7 +32,7 @@ export class ResolveThesisArtifactUseCase {
     if (active?.datasetId === dataset.datasetId) return active;
     const latest = await this.analyses.latestFor(dataset.datasetId);
     if (latest) {
-      await this.analyses.setActive(latest.analysisId);
+      await this.activation.activateAnalysisIfCurrent(dataset, latest);
       return latest;
     }
     const analysis = analyzeSession([...dataset.candles]);
@@ -58,7 +60,7 @@ export class ResolveThesisArtifactUseCase {
     const thesis = validateTradeThesis(value);
     const existing = await this.analyses.latestFor(dataset.datasetId);
     if (existing?.provider === 'gateway' && JSON.stringify(existing.thesis) === JSON.stringify(thesis)) {
-      await this.analyses.setActive(existing.analysisId);
+      await this.activation.activateAnalysisIfCurrent(dataset, existing);
       return existing;
     }
     return this.save(dataset, 'gateway', thesis, true);
@@ -79,7 +81,7 @@ export class ResolveThesisArtifactUseCase {
       schemaVersion: 'thesis-v1',
       createdAt: this.now(),
     });
-    if (activate) await this.analyses.setActive(artifact.analysisId);
+    if (activate) await this.activation.activateAnalysisIfCurrent(dataset, artifact);
     return artifact;
   }
 
@@ -95,8 +97,7 @@ export class ResolveThesisArtifactUseCase {
       symbol: normalizeSymbol(legacy.symbol),
       candles: [...legacy.candles],
     });
-    await this.datasets.setActive(record.datasetId);
-    await this.analyses.clearActive();
+    await this.activation.activateDataset(record);
     return record;
   }
 }
