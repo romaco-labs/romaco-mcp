@@ -12,6 +12,10 @@ export type ReplayableChartCommand = Extract<
 >;
 
 export interface DesiredChartEntry<Command> {
+  /** Stable logical entry identity; remove + re-add always allocates a new id. */
+  entryId: string;
+  /** CAS version for in-place slot updates such as atomic group replacement. */
+  entryVersion: number;
   command: Command;
   identity: ChartIdentity;
   resourceIds: readonly string[];
@@ -51,8 +55,8 @@ export interface ChartDesiredStatePort extends ChartJournalPort, ChartDrawingJou
   structuralRevision(): number;
   snapshot(): ChartDesiredStateSnapshot;
   bindReplayedResources(
-    command: ReplayableChartCommand | ReplaceDrawingGroupCommand,
-    identity: ChartIdentity,
+    entryId: string,
+    entryVersion: number,
     resourceIds: readonly string[],
-  ): void;
+  ): boolean;
 }

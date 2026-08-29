@@ -9,7 +9,6 @@ import type { ChartPresetIndicator } from '../application/ports/chartPresetCatal
 import type { ChartIdentity } from '../domain/chart/model.js';
 import type { ChartCommand } from '../domain/chart/model.js';
 import { ChartStateJournal, chartState } from '../chartState.js';
-import type { BridgeAction } from '../types.js';
 
 function hasReplayIdentity(identity: ChartIdentity | undefined): identity is ChartIdentity & {
   symbol: string;
@@ -106,6 +105,8 @@ export class LegacyChartJournal implements ChartJournalPort, ChartDrawingJournal
       entries.flatMap((entry) => {
         if (!hasReplayIdentity(entry.identity)) return [];
         return [{
+          entryId: entry.entryId,
+          entryVersion: entry.entryVersion,
           command: entry.action as Command,
           identity: { ...entry.identity },
           resourceIds: entry.resourceId ? [entry.resourceId] : [],
@@ -119,6 +120,8 @@ export class LegacyChartJournal implements ChartJournalPort, ChartDrawingJournal
       drawingGroups: snapshot.drawingGroups.flatMap((entry) => {
         if (!hasReplayIdentity(entry.identity) || entry.action.action !== 'replaceAgentDrawingGroup') return [];
         return [{
+          entryId: entry.entryId,
+          entryVersion: entry.entryVersion,
           command: {
             groupId: entry.action.groupId,
             idempotencyKey: entry.action.idempotencyKey,
@@ -137,28 +140,10 @@ export class LegacyChartJournal implements ChartJournalPort, ChartDrawingJournal
   }
 
   bindReplayedResources(
-    command: ReplayableChartCommand | import('../domain/chart/model.js').ReplaceDrawingGroupCommand,
-    identity: ChartIdentity,
+    entryId: string,
+    entryVersion: number,
     resourceIds: readonly string[],
-  ): void {
-    if (!hasReplayIdentity(identity)) return;
-    if ('idempotencyKey' in command) {
-      const action: Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }> = {
-        action: 'replaceAgentDrawingGroup',
-        groupId: command.groupId,
-        idempotencyKey: command.idempotencyKey,
-        expectedIdentity: {
-          chartId: identity.chartId,
-          symbol: identity.symbol,
-          resolution: identity.timeframe,
-        },
-        drawings: command.drawings.map(({ drawingType, points, label, style, paneId }) => ({
-          drawingType, points, label, style, paneId,
-        })),
-      };
-      this.state.bindResourceIds(action, resourceIds, identity);
-      return;
-    }
-    if (resourceIds[0]) this.state.bindResourceId(command as BridgeAction, resourceIds[0], identity);
+  ): boolean {
+    return this.state.bindEntryResources(entryId, entryVersion, resourceIds);
   }
 }

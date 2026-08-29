@@ -14,10 +14,12 @@ describe('ChartStateJournal — recordIndicator', () => {
     chartState.recordIndicator({ action: 'addIndicator', indicatorType: 'EMA', params: [20] }, 'AAPL');
     const snap = chartState.snapshot();
     expect(snap.indicators).toHaveLength(1);
-    expect(snap.indicators[0]).toEqual({
+    expect(snap.indicators[0]).toMatchObject({
       action: { action: 'addIndicator', indicatorType: 'EMA', params: [20] },
       symbol: 'AAPL',
     });
+    expect(snap.indicators[0].entryId).toMatch(/^indicator_/);
+    expect(snap.indicators[0].entryVersion).toBe(1);
   });
 
   it('dedups same type+params (case-insensitive) — no stacking on replay', () => {
@@ -164,5 +166,29 @@ describe('ChartStateJournal — snapshot isolation', () => {
 
     state.removeIndicator(identity, 'rsi-live', 'RSI', [14]);
     expect(state.structuralRevision()).toBeGreaterThan(recorded);
+  });
+
+  it('allocates a new entry id after remove + re-add and versions group slots in place', () => {
+    const state = new ChartStateJournal();
+    const indicator = { action: 'addIndicator' as const, indicatorType: 'RSI', params: [14] };
+    state.recordIndicator(indicator, AAPL_DAILY, 'old-rsi');
+    const oldIndicatorId = state.snapshot().indicators[0].entryId;
+    state.removeIndicator(AAPL_DAILY, 'old-rsi', 'RSI', [14]);
+    state.recordIndicator(indicator, AAPL_DAILY, 'new-rsi');
+    expect(state.snapshot().indicators[0].entryId).not.toBe(oldIndicatorId);
+
+    const group = {
+      action: 'replaceAgentDrawingGroup' as const,
+      groupId: 'romaco-mcp/thesis',
+      idempotencyKey: 'v1',
+      expectedIdentity: { chartId: 'primary', symbol: 'AAPL', resolution: '1d' },
+      drawings: [],
+    };
+    state.replaceDrawingGroup(group, AAPL_DAILY);
+    const first = state.snapshot().drawingGroups[0];
+    state.replaceDrawingGroup({ ...group, idempotencyKey: 'v2' }, AAPL_DAILY);
+    const second = state.snapshot().drawingGroups[0];
+    expect(second.entryId).toBe(first.entryId);
+    expect(second.entryVersion).toBe(first.entryVersion + 1);
   });
 });

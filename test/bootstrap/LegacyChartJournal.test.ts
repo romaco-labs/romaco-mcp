@@ -18,16 +18,16 @@ describe('LegacyChartJournal desired-state adapter', () => {
     journal.recordIndicator({ type: 'RSI', params: [14] }, TSLA, 'rsi-tsla');
 
     expect(journal.snapshot().indicators).toEqual([
-      {
+      expect.objectContaining({
         command: { action: 'addIndicator', indicatorType: 'RSI', params: [14] },
         identity: AAPL,
         resourceIds: ['rsi-aapl'],
-      },
-      {
+      }),
+      expect.objectContaining({
         command: { action: 'addIndicator', indicatorType: 'RSI', params: [14] },
         identity: TSLA,
         resourceIds: ['rsi-tsla'],
-      },
+      }),
     ]);
   });
 
@@ -91,10 +91,11 @@ describe('LegacyChartJournal desired-state adapter', () => {
 
     const groups = journal.snapshot().drawingGroups;
     expect(groups).toHaveLength(2);
-    expect(groups.map((entry) => [entry.identity.symbol, entry.command.idempotencyKey])).toEqual([
-      ['TSLA', 'tsla-v1'],
-      ['AAPL', 'aapl-v2'],
-    ]);
+    expect(groups.map((entry) => [entry.identity.symbol, entry.command.idempotencyKey])).toEqual(
+      expect.arrayContaining([['TSLA', 'tsla-v1'], ['AAPL', 'aapl-v2']]),
+    );
+    const aapl = groups.find((entry) => entry.identity.symbol === 'AAPL')!;
+    expect(aapl.entryVersion).toBe(2);
   });
 
   it('fails closed by hiding unattributed legacy entries from reconciliation', () => {

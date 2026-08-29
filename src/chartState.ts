@@ -17,6 +17,10 @@ import type { ChartIdentity } from './domain/chart/model.js';
 
 /** A recorded action plus the symbol that was loaded when it was applied. */
 export interface JournalEntry {
+  /** Stable desired-entry identity for replay CAS. */
+  entryId: string;
+  /** Incremented when one logical slot is replaced in place. */
+  entryVersion: number;
   action: BridgeAction;
   /** Symbol active at record time. null = applied with no data loaded. */
   symbol: string | null;
@@ -60,6 +64,12 @@ export class ChartStateJournal {
   private drawingGroups: JournalEntry[] = [];
   private alerts: JournalEntry[] = [];
   private revision = 0;
+  private nextEntryId = 0;
+
+  private allocateEntryId(kind: string): string {
+    this.nextEntryId += 1;
+    return `${kind}_${this.nextEntryId}`;
+  }
 
   structuralRevision(): number {
     return this.revision;
@@ -85,6 +95,12 @@ export class ChartStateJournal {
       ),
     );
     const next: JournalEntry = {
+      entryId: existing === -1
+        ? this.allocateEntryId('indicator')
+        : this.indicators[existing].entryId,
+      entryVersion: existing === -1
+        ? 1
+        : this.indicators[existing].entryVersion + 1,
       action,
       symbol,
       ...(identity ? { identity: { ...identity } } : {}),
@@ -105,6 +121,8 @@ export class ChartStateJournal {
     resourceId?: string,
   ): void {
     this.drawings.push({
+      entryId: this.allocateEntryId('drawing'),
+      entryVersion: 1,
       action,
       symbol: identity.symbol ?? null,
       identity: { ...identity },
@@ -119,6 +137,8 @@ export class ChartStateJournal {
     resourceId?: string,
   ): void {
     this.alerts.push({
+      entryId: this.allocateEntryId('alert'),
+      entryVersion: 1,
       action,
       symbol: identity.symbol ?? null,
       identity: { ...identity },
@@ -133,13 +153,26 @@ export class ChartStateJournal {
     identity: ChartIdentity,
     resourceIds: readonly string[] = [],
   ): void {
-    this.removeDrawingsByGroup(action.groupId, identity);
-    this.drawingGroups.push({
+    const existingIndex = this.drawingGroups.findIndex((entry) => (
+      entry.action.action === 'replaceAgentDrawingGroup'
+      && entry.action.groupId === action.groupId
+      && sameIdentity(entry.identity, identity)
+    ));
+    const existing = existingIndex >= 0 ? this.drawingGroups[existingIndex] : undefined;
+    this.drawings = this.drawings.filter((entry) => {
+      const drawing = entry.action as Extract<BridgeAction, { action: 'addDrawing' }>;
+      return drawing.groupId !== action.groupId || !sameIdentity(entry.identity, identity);
+    });
+    const next: JournalEntry = {
+      entryId: existing?.entryId ?? this.allocateEntryId('drawing-group'),
+      entryVersion: existing ? existing.entryVersion + 1 : 1,
       action,
       symbol: identity.symbol ?? null,
       identity: { ...identity },
       resourceIds: [...resourceIds],
-    });
+    };
+    if (existingIndex >= 0) this.drawingGroups[existingIndex] = next;
+    else this.drawingGroups.push(next);
     this.revision += 1;
   }
 
@@ -275,6 +308,25 @@ export class ChartStateJournal {
       && (identity === undefined || sameIdentity(candidate.identity, identity))
     );
     if (entry) entry.resourceIds = [...resourceIds];
+  }
+
+  /** CAS resource binding: stale replay results can never bind a replacement entry. */
+  bindEntryResources(entryId: string, entryVersion: number, resourceIds: readonly string[]): boolean {
+    const entry = [
+      ...this.indicators,
+      ...this.drawings,
+      ...this.drawingGroups,
+      ...this.alerts,
+    ].find((candidate) => candidate.entryId === entryId);
+    if (!entry || entry.entryVersion !== entryVersion) return false;
+    if (entry.action.action === 'replaceAgentDrawingGroup') {
+      entry.resourceIds = [...resourceIds];
+    } else if (resourceIds[0]) {
+      entry.resourceId = resourceIds[0];
+    } else {
+      delete entry.resourceId;
+    }
+    return true;
   }
 
   /** Reset everything. Used by tests. */
