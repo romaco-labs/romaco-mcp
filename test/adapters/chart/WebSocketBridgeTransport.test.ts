@@ -185,6 +185,22 @@ describe('WebSocketBridgeTransport paired v2', () => {
     expect(bridge.chartId).toBe('legitimate');
   });
 
+  it('accepts authenticated ready re-announcements for chart changes', async () => {
+    const { bridge, port } = await start();
+    const announced: Array<string | null> = [];
+    bridge.setOnReady(() => announced.push(bridge.chartId));
+    const ws = await connect(port);
+    await pair(ws, 'chart-a');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    ws.send(JSON.stringify({ type: 'ready', protocolVersion: 2, chartId: 'chart-b' }));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    expect(bridge.chartId).toBe('chart-b');
+    expect(announced).toEqual(['chart-a', 'chart-b']);
+    expect(ws.readyState).toBe(WebSocket.OPEN);
+  });
+
   it('accepts a response only from the socket that owns the pending request', async () => {
     const { bridge, port } = await start();
     const owner = await connect(port);
@@ -209,5 +225,36 @@ describe('WebSocketBridgeTransport paired v2', () => {
       result: { success: true, data: 'owner' },
     }));
     await expect(resultPromise).resolves.toEqual({ success: true, data: 'owner' });
+  });
+
+  it('keeps pending ownership when handleResult receives a valid spoofed response', () => {
+    const bridge = new WebSocketBridgeTransport(pairedConfig(portSeed++));
+    const owner = {} as WebSocket;
+    const stranger = {} as WebSocket;
+    let resolved: unknown;
+    const timer = setTimeout(() => undefined, 60_000);
+    const internal = bridge as unknown as {
+      pending: Map<string, {
+        resolve(value: unknown): void;
+        reject(reason: Error): void;
+        timer: ReturnType<typeof setTimeout>;
+        socket: WebSocket;
+      }>;
+      handleResult(message: unknown, ws: WebSocket): void;
+    };
+    internal.pending.set('owned', {
+      resolve: (value) => { resolved = value; },
+      reject: () => undefined,
+      timer,
+      socket: owner,
+    });
+
+    internal.handleResult({ type: 'action_result', requestId: 'owned', result: { success: true, data: 'spoofed' } }, stranger);
+    expect(resolved).toBeUndefined();
+    expect(internal.pending.has('owned')).toBe(true);
+
+    internal.handleResult({ type: 'action_result', requestId: 'owned', result: { success: true, data: 'owner' } }, owner);
+    expect(resolved).toEqual({ success: true, data: 'owner' });
+    expect(internal.pending.has('owned')).toBe(false);
   });
 });

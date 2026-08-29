@@ -5,11 +5,7 @@ export type RequestedBridgeAuthMode = 'auto' | BridgeAuthMode;
 
 export type BridgeConfig = BridgeTransportConfig;
 
-const DEFAULT_ORIGINS = [
-  'https://romaco.io',
-  'https://www.romaco.io',
-  'https://app.romaco.io',
-];
+const DEFAULT_ORIGINS = ['https://romaco.io'];
 
 function resolvePort(argv: readonly string[], env: NodeJS.ProcessEnv): number {
   const index = argv.indexOf('--port');

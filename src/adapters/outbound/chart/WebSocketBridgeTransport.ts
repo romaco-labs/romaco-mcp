@@ -220,7 +220,13 @@ export class WebSocketBridgeTransport {
       return;
     }
 
-    if (state.phase === 'ready') this.handleResult(message, ws);
+    if (state.phase === 'ready') {
+      if (isReadyMessage(message, true)) {
+        this.handleReady(message, ws);
+        return;
+      }
+      this.handleResult(message, ws);
+    }
   }
 
   private handleLegacyMessage(message: unknown, ws: WebSocket, state: ConnectionState): void {
