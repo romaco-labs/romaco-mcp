@@ -90,6 +90,10 @@ export class LegacyChartJournal implements ChartJournalPort, ChartDrawingJournal
     this.state.removeAlert(resourceId, price, direction);
   }
 
+  structuralRevision(): number {
+    return this.state.structuralRevision();
+  }
+
   snapshot(): ChartDesiredStateSnapshot {
     const snapshot = this.state.snapshot();
     const direct = <Command extends ReplayableChartCommand>(entries: typeof snapshot.indicators) => (

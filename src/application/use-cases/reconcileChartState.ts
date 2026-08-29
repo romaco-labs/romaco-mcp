@@ -115,7 +115,9 @@ export class ReconcileChartStateUseCase {
 
   async execute(options: ReconcileChartStateOptions = {}): Promise<ReconcileChartStateResult> {
     const generation = ++this.generation;
+    const initialRevision = this.desiredState.structuralRevision();
     const initialDesired = this.desiredState.snapshot();
+    if (initialRevision !== this.desiredState.structuralRevision()) return this.result('superseded');
     if (stateSize(initialDesired) === 0) return this.result('empty');
 
     const attempts = Math.max(1, options.attempts ?? READY_RETRY_ATTEMPTS);
@@ -148,28 +150,36 @@ export class ReconcileChartStateUseCase {
 
     // Desired state can change while chart readiness retries are in flight.
     // Recapture only after context is ready so removed entries never resurrect.
+    const revision = this.desiredState.structuralRevision();
     const desired = this.desiredState.snapshot();
-    return this.applyDesiredState(desired, context, generation);
+    if (revision !== this.desiredState.structuralRevision()) return this.result('superseded');
+    return this.applyDesiredState(desired, context, generation, revision);
   }
 
   private async applyDesiredState(
     desired: ChartDesiredStateSnapshot,
     context: ChartContext,
     generation: number,
+    revision: number,
   ): Promise<ReconcileChartStateResult> {
     let applied = 0;
     let skippedIdentity = 0;
     const failures: ReconcileFailure[] = [];
+    const isCurrent = (): boolean => (
+      generation === this.generation
+      && revision === this.desiredState.structuralRevision()
+    );
     const apply = async (
       entry: DesiredChartEntry<ReplayableChartCommand>,
       present: { id?: string } | undefined,
     ): Promise<boolean> => {
-      if (generation !== this.generation) return false;
+      if (!isCurrent()) return false;
       if (!sameIdentity(entry.identity, context.identity)) {
         skippedIdentity += 1;
         return true;
       }
       if (present) {
+        if (!isCurrent()) return false;
         if (present.id) {
           this.desiredState.bindReplayedResources(
             entry.command,
@@ -177,25 +187,28 @@ export class ReconcileChartStateUseCase {
             [present.id],
           );
         }
-        return true;
+        return isCurrent();
       }
+      if (!isCurrent()) return false;
       try {
         const result = await this.chart.execute(entry.command, { expectedIdentity: entry.identity });
-        if (generation !== this.generation) return false;
+        if (!isCurrent()) return false;
         if (!result.success) throw new Error(result.error ?? 'chart rejected action');
         this.desiredState.bindReplayedResources(
           entry.command,
           entry.identity,
           result.resourceIds ?? [],
         );
+        if (!isCurrent()) return false;
         applied += 1;
       } catch (error) {
+        if (!isCurrent()) return false;
         failures.push({
           action: entry.command.action,
           message: error instanceof Error ? error.message : String(error),
         });
       }
-      return generation === this.generation;
+      return isCurrent();
     };
 
     for (const entry of desired.indicators) {
@@ -204,7 +217,7 @@ export class ReconcileChartStateUseCase {
       }
     }
     for (const entry of desired.drawingGroups) {
-      if (generation !== this.generation) {
+      if (!isCurrent()) {
         return { status: 'superseded', applied, skippedIdentity, failures };
       }
       if (!sameIdentity(entry.identity, context.identity)) {
@@ -212,12 +225,15 @@ export class ReconcileChartStateUseCase {
         continue;
       }
       try {
+        if (!isCurrent()) {
+          return { status: 'superseded', applied, skippedIdentity, failures };
+        }
         const command: ReplaceDrawingGroupCommand = {
           ...entry.command,
           expectedIdentity: entry.identity,
         };
         const result = await this.chart.replaceDrawingGroup(command);
-        if (generation !== this.generation) {
+        if (!isCurrent()) {
           return { status: 'superseded', applied, skippedIdentity, failures };
         }
         if (!result.success) throw new Error(result.error ?? 'chart rejected atomic replacement');
@@ -226,8 +242,14 @@ export class ReconcileChartStateUseCase {
           entry.identity,
           result.resourceIds ?? [],
         );
+        if (!isCurrent()) {
+          return { status: 'superseded', applied, skippedIdentity, failures };
+        }
         applied += 1;
       } catch (error) {
+        if (!isCurrent()) {
+          return { status: 'superseded', applied, skippedIdentity, failures };
+        }
         failures.push({
           action: 'replaceDrawingGroup',
           message: error instanceof Error ? error.message : String(error),

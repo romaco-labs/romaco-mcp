@@ -39,6 +39,7 @@ function desiredState(snapshot: ChartDesiredStateSnapshot): ChartDesiredStatePor
     recordAlert: vi.fn(),
     removeIndicator: vi.fn(),
     removeAlert: vi.fn(),
+    structuralRevision: vi.fn(() => 0),
     snapshot: vi.fn(() => snapshot),
     bindReplayedResources: vi.fn(),
   };
@@ -240,6 +241,29 @@ describe('ReconcileChartStateUseCase', () => {
 
     await expect(older).resolves.toMatchObject({ status: 'superseded', applied: 0 });
     expect(live.execute).toHaveBeenCalledOnce();
+    expect(state.bindReplayedResources).not.toHaveBeenCalled();
+  });
+
+  it('stops and never binds when desired structure changes during a replay write', async () => {
+    const initial = {
+      ...emptySnapshot(),
+      indicators: [{ command: RSI, identity: AAPL, resourceIds: [] }],
+    };
+    let revision = 1;
+    const state = desiredState(initial);
+    vi.mocked(state.structuralRevision).mockImplementation(() => revision);
+    const live = chart(AAPL);
+    let finishApply: ((result: { success: true; resourceIds: string[] }) => void) | undefined;
+    vi.mocked(live.execute).mockImplementationOnce(() => new Promise((resolve) => {
+      finishApply = resolve;
+    }));
+
+    const pending = new ReconcileChartStateUseCase(live, state).execute();
+    await vi.waitFor(() => expect(live.execute).toHaveBeenCalledOnce());
+    revision += 1; // concurrent desired-state removal
+    finishApply?.({ success: true, resourceIds: ['late-rsi'] });
+
+    await expect(pending).resolves.toMatchObject({ status: 'superseded', applied: 0 });
     expect(state.bindReplayedResources).not.toHaveBeenCalled();
   });
 

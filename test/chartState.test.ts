@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { chartState } from '../src/chartState.js';
+import { ChartStateJournal, chartState } from '../src/chartState.js';
 import { createChartId } from '../src/domain/chart/model.js';
 import { LegacyChartJournal } from '../src/bootstrap/LegacyChartJournal.js';
 
@@ -146,5 +146,23 @@ describe('ChartStateJournal — snapshot isolation', () => {
     const snap = chartState.snapshot();
     snap.indicators.push({ action: { action: 'addIndicator', indicatorType: 'X' }, symbol: null });
     expect(chartState.snapshot().indicators).toHaveLength(1);
+  });
+
+  it('increments only structural revision, never resource-id binds', () => {
+    const state = new ChartStateJournal();
+    const identity = {
+      chartId: createChartId('primary'), symbol: 'AAPL', timeframe: '1d' as const,
+    };
+    const action = { action: 'addIndicator' as const, indicatorType: 'RSI', params: [14] };
+    expect(state.structuralRevision()).toBe(0);
+
+    state.recordIndicator(action, identity);
+    const recorded = state.structuralRevision();
+    expect(recorded).toBeGreaterThan(0);
+    state.bindResourceId(action, 'rsi-live', identity);
+    expect(state.structuralRevision()).toBe(recorded);
+
+    state.removeIndicator('rsi-live', 'RSI', [14]);
+    expect(state.structuralRevision()).toBeGreaterThan(recorded);
   });
 });

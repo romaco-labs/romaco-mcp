@@ -58,6 +58,11 @@ export class ChartStateJournal {
   private drawings: JournalEntry[] = [];
   private drawingGroups: JournalEntry[] = [];
   private alerts: JournalEntry[] = [];
+  private revision = 0;
+
+  structuralRevision(): number {
+    return this.revision;
+  }
 
   /** Record an applied indicator. Deduped by type+params so replays never stack. */
   recordIndicator(
@@ -86,9 +91,11 @@ export class ChartStateJournal {
     };
     if (existing !== -1) {
       this.indicators[existing] = next;
+      this.revision += 1;
       return;
     }
     this.indicators.push(next);
+    this.revision += 1;
   }
 
   recordDrawing(
@@ -102,6 +109,7 @@ export class ChartStateJournal {
       identity: { ...identity },
       ...(resourceId ? { resourceId } : {}),
     });
+    this.revision += 1;
   }
 
   recordAlert(
@@ -115,6 +123,7 @@ export class ChartStateJournal {
       identity: { ...identity },
       ...(resourceId ? { resourceId } : {}),
     });
+    this.revision += 1;
   }
 
   /** Store one complete desired atomic group, never N independently replayed adds. */
@@ -130,16 +139,20 @@ export class ChartStateJournal {
       identity: { ...identity },
       resourceIds: [...resourceIds],
     });
+    this.revision += 1;
   }
 
   /** Mirror the clearDrawings bridge action so reconcile won't re-add them. */
   clearDrawings(): void {
+    if (this.drawings.length === 0 && this.drawingGroups.length === 0) return;
     this.drawings = [];
     this.drawingGroups = [];
+    this.revision += 1;
   }
 
   /** Drop journaled drawings in a group so reconcile won't replay a replaced set. */
   removeDrawingsByGroup(groupId: string, identity?: ChartIdentity): void {
+    const before = this.drawings.length + this.drawingGroups.length;
     this.drawings = this.drawings.filter(
       (entry) => (
         (entry.action as Extract<BridgeAction, { action: 'addDrawing' }>).groupId !== groupId
@@ -152,10 +165,12 @@ export class ChartStateJournal {
         || (identity !== undefined && !sameIdentity(entry.identity, identity))
       ),
     );
+    if (this.drawings.length + this.drawingGroups.length !== before) this.revision += 1;
   }
 
   /** Drop one group's desired state only for exact chart identity. */
   removeDrawingsByGroupForIdentity(groupId: string, identity: ChartIdentity): void {
+    const before = this.drawings.length + this.drawingGroups.length;
     this.drawings = this.drawings.filter((entry) => {
       const action = entry.action as Extract<BridgeAction, { action: 'addDrawing' }>;
       return action.groupId !== groupId || !hasIdentity(entry, identity);
@@ -164,6 +179,7 @@ export class ChartStateJournal {
       const action = entry.action as Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>;
       return action.groupId !== groupId || !hasIdentity(entry, identity);
     });
+    if (this.drawings.length + this.drawingGroups.length !== before) this.revision += 1;
   }
 
   /** Immutable view of the desired state, for the reconciler. */
@@ -177,7 +193,9 @@ export class ChartStateJournal {
   }
 
   clearAlerts(): void {
+    if (this.alerts.length === 0) return;
     this.alerts = [];
+    this.revision += 1;
   }
 
   removeAlert(resourceId: string, price: number, direction: string): void {
@@ -187,7 +205,10 @@ export class ChartStateJournal {
       return action.price === price && (action.options?.direction ?? 'cross') === direction;
     });
     const index = exact >= 0 ? exact : fallback;
-    if (index >= 0) this.alerts.splice(index, 1);
+    if (index >= 0) {
+      this.alerts.splice(index, 1);
+      this.revision += 1;
+    }
   }
 
   removeIndicator(resourceId: string, indicatorType: string, params: number[] = []): void {
@@ -197,7 +218,10 @@ export class ChartStateJournal {
       indicatorKey(entry.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key,
     );
     const index = exact >= 0 ? exact : fallback;
-    if (index >= 0) this.indicators.splice(index, 1);
+    if (index >= 0) {
+      this.indicators.splice(index, 1);
+      this.revision += 1;
+    }
   }
 
   bindResourceId(action: BridgeAction, resourceId: string, identity?: ChartIdentity): void {
@@ -242,10 +266,15 @@ export class ChartStateJournal {
 
   /** Reset everything. Used by tests. */
   clear(): void {
+    const changed = this.indicators.length > 0
+      || this.drawings.length > 0
+      || this.drawingGroups.length > 0
+      || this.alerts.length > 0;
     this.indicators = [];
     this.drawings = [];
     this.drawingGroups = [];
     this.alerts = [];
+    if (changed) this.revision += 1;
   }
 }
 
