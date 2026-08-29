@@ -260,6 +260,12 @@ export class ReconcileChartStateUseCase {
         notReadyReason: lastError instanceof Error ? lastError.message : String(lastError),
       };
     }
+    if (!context.identity.symbol || !context.identity.timeframe) {
+      return {
+        ...this.result('not-ready'),
+        notReadyReason: 'chart identity is incomplete; symbol and timeframe are required',
+      };
+    }
 
     const hadMatchingDebts = [...this.debts.values()].some((debt) => (
       sameIdentity(debt.entry.identity, context!.identity)

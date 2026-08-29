@@ -108,6 +108,25 @@ describe('ReconcileChartStateUseCase', () => {
     expect(state.bindReplayedResources).not.toHaveBeenCalled();
   });
 
+  it('treats incomplete live identity as not ready before any replay or debt cleanup', async () => {
+    const state = desiredState({
+      ...emptySnapshot(),
+      indicators: [{ command: RSI, identity: AAPL, resourceIds: ['old-rsi'] }],
+    });
+    const live = chart(AAPL);
+    vi.mocked(live.getContext).mockResolvedValue({
+      identity: { chartId: createChartId('chart-a') },
+      totalCandles: 300,
+      indicators: [], drawings: [], alerts: [],
+    });
+
+    await expect(new ReconcileChartStateUseCase(live, state).execute()).resolves.toMatchObject({
+      status: 'not-ready',
+      notReadyReason: expect.stringMatching(/identity is incomplete/i),
+    });
+    expect(live.execute).not.toHaveBeenCalled();
+  });
+
   it('replays an atomic group as one replacement command with exact identity', async () => {
     const state = desiredState({
       ...emptySnapshot(),
