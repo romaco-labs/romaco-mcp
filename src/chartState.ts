@@ -50,7 +50,8 @@ function hasIdentity(entry: JournalEntry, identity: ChartIdentity): boolean {
 function sameIdentity(left: ChartIdentity | undefined, right: ChartIdentity): boolean {
   return left?.chartId === right.chartId
     && left.symbol === right.symbol
-    && left.timeframe === right.timeframe;
+    && left.timeframe === right.timeframe
+    && left.datasetId === right.datasetId;
 }
 
 export class ChartStateJournal {
@@ -198,11 +199,15 @@ export class ChartStateJournal {
     this.revision += 1;
   }
 
-  removeAlert(resourceId: string, price: number, direction: string): void {
-    const exact = this.alerts.findIndex((entry) => entry.resourceId === resourceId);
+  removeAlert(identity: ChartIdentity, resourceId: string, price: number, direction: string): void {
+    const exact = this.alerts.findIndex((entry) => (
+      sameIdentity(entry.identity, identity) && entry.resourceId === resourceId
+    ));
     const fallback = this.alerts.findIndex((entry) => {
       const action = entry.action as Extract<BridgeAction, { action: 'addAlert' }>;
-      return action.price === price && (action.options?.direction ?? 'cross') === direction;
+      return sameIdentity(entry.identity, identity)
+        && action.price === price
+        && (action.options?.direction ?? 'cross') === direction;
     });
     const index = exact >= 0 ? exact : fallback;
     if (index >= 0) {
@@ -211,11 +216,19 @@ export class ChartStateJournal {
     }
   }
 
-  removeIndicator(resourceId: string, indicatorType: string, params: number[] = []): void {
-    const exact = this.indicators.findIndex((entry) => entry.resourceId === resourceId);
+  removeIndicator(
+    identity: ChartIdentity,
+    resourceId: string,
+    indicatorType: string,
+    params: number[] = [],
+  ): void {
+    const exact = this.indicators.findIndex((entry) => (
+      sameIdentity(entry.identity, identity) && entry.resourceId === resourceId
+    ));
     const key = `${indicatorType.toLowerCase()}:${params.join(',')}`;
     const fallback = this.indicators.findIndex((entry) =>
-      indicatorKey(entry.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key,
+      sameIdentity(entry.identity, identity)
+      && indicatorKey(entry.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key,
     );
     const index = exact >= 0 ? exact : fallback;
     if (index >= 0) {

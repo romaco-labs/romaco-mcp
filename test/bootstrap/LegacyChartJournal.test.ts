@@ -40,12 +40,40 @@ describe('LegacyChartJournal desired-state adapter', () => {
       'alert-aapl',
     );
 
-    journal.removeIndicator('rsi-aapl', 'RSI', [14]);
-    journal.removeAlert('alert-aapl', 150, 'above');
+    journal.removeIndicator(AAPL, 'rsi-aapl', 'RSI', [14]);
+    journal.removeAlert(AAPL, 'alert-aapl', 150, 'above');
 
     expect(journal.snapshot()).toEqual({
       indicators: [], drawings: [], drawingGroups: [], alerts: [],
     });
+  });
+
+  it('scopes exact-id and semantic-fallback removals to full identity', () => {
+    const journal = new LegacyChartJournal(new ChartStateJournal());
+    journal.recordIndicator({ type: 'RSI', params: [14] }, AAPL, 'shared-rsi');
+    journal.recordIndicator({ type: 'RSI', params: [14] }, TSLA, 'shared-rsi');
+    journal.recordIndicator({ type: 'EMA', params: [20] }, AAPL, 'aapl-ema');
+    journal.recordIndicator({ type: 'EMA', params: [20] }, TSLA, 'tsla-ema');
+    journal.recordAlert(
+      { action: 'addAlert', price: 150, options: { direction: 'above' } },
+      AAPL,
+      'shared-alert',
+    );
+    journal.recordAlert(
+      { action: 'addAlert', price: 150, options: { direction: 'above' } },
+      TSLA,
+      'shared-alert',
+    );
+
+    journal.removeIndicator(AAPL, 'shared-rsi', 'RSI', [14]);
+    journal.removeIndicator(AAPL, 'missing-id', 'EMA', [20]);
+    journal.removeAlert(AAPL, 'shared-alert', 150, 'above');
+
+    const snapshot = journal.snapshot();
+    expect(snapshot.indicators.map((entry) => [entry.identity, entry.command.indicatorType]))
+      .toEqual([[TSLA, 'RSI'], [TSLA, 'EMA']]);
+    expect(snapshot.alerts).toHaveLength(1);
+    expect(snapshot.alerts[0].identity).toEqual(TSLA);
   });
 
   it('replaces a drawing group only within its exact identity scope', () => {

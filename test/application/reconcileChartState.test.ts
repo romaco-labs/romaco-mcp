@@ -7,6 +7,8 @@ import type {
 import { ReconcileChartStateUseCase } from '../../src/application/use-cases/reconcileChartState.js';
 import type { ChartIdentity, ReplaceDrawingGroupCommand } from '../../src/domain/chart/model.js';
 import { createChartId } from '../../src/domain/chart/model.js';
+import { LegacyChartJournal } from '../../src/bootstrap/LegacyChartJournal.js';
+import { ChartStateJournal } from '../../src/chartState.js';
 
 const AAPL: ChartIdentity = {
   chartId: createChartId('chart-a'), symbol: 'AAPL', timeframe: '1d',
@@ -265,6 +267,24 @@ describe('ReconcileChartStateUseCase', () => {
 
     await expect(pending).resolves.toMatchObject({ status: 'superseded', applied: 0 });
     expect(state.bindReplayedResources).not.toHaveBeenCalled();
+  });
+
+  it('keeps concurrent exact removal absent when replay write completes late', async () => {
+    const journal = new LegacyChartJournal(new ChartStateJournal());
+    journal.recordIndicator({ type: 'RSI', params: [14] }, AAPL);
+    const live = chart(AAPL);
+    let finishApply: ((result: { success: true; resourceIds: string[] }) => void) | undefined;
+    vi.mocked(live.execute).mockImplementationOnce(() => new Promise((resolve) => {
+      finishApply = resolve;
+    }));
+
+    const pending = new ReconcileChartStateUseCase(live, journal).execute();
+    await vi.waitFor(() => expect(live.execute).toHaveBeenCalledOnce());
+    journal.removeIndicator(AAPL, 'not-bound-yet', 'RSI', [14]);
+    finishApply?.({ success: true, resourceIds: ['late-rsi'] });
+
+    await expect(pending).resolves.toMatchObject({ status: 'superseded', applied: 0 });
+    expect(journal.snapshot().indicators).toEqual([]);
   });
 
   it('retries unready chart and cancels older reconciliation generation', async () => {

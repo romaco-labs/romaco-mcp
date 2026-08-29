@@ -36,8 +36,18 @@ export interface ChartDesiredStatePort extends ChartJournalPort, ChartDrawingJou
     identity: ChartIdentity,
     resourceId?: string,
   ): void;
-  removeIndicator(resourceId: string, indicatorType: string, params?: readonly number[]): void;
-  removeAlert(resourceId: string, price: number, direction: 'above' | 'below' | 'cross'): void;
+  removeIndicator(
+    identity: ChartIdentity,
+    resourceId: string,
+    indicatorType: string,
+    params?: readonly number[],
+  ): void;
+  removeAlert(
+    identity: ChartIdentity,
+    resourceId: string,
+    price: number,
+    direction: 'above' | 'below' | 'cross',
+  ): void;
   structuralRevision(): number;
   snapshot(): ChartDesiredStateSnapshot;
   bindReplayedResources(

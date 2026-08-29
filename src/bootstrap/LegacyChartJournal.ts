@@ -78,16 +78,22 @@ export class LegacyChartJournal implements ChartJournalPort, ChartDrawingJournal
     this.state.recordAlert(alert, identity, resourceId);
   }
 
-  removeIndicator(resourceId: string, indicatorType: string, params: readonly number[] = []): void {
-    this.state.removeIndicator(resourceId, indicatorType, [...params]);
+  removeIndicator(
+    identity: ChartIdentity,
+    resourceId: string,
+    indicatorType: string,
+    params: readonly number[] = [],
+  ): void {
+    this.state.removeIndicator(identity, resourceId, indicatorType, [...params]);
   }
 
   removeAlert(
+    identity: ChartIdentity,
     resourceId: string,
     price: number,
     direction: 'above' | 'below' | 'cross',
   ): void {
-    this.state.removeAlert(resourceId, price, direction);
+    this.state.removeAlert(identity, resourceId, price, direction);
   }
 
   structuralRevision(): number {

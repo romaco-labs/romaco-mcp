@@ -44,7 +44,7 @@ export function registerRemoveIndicator(
         };
       }
       if (result.success) {
-        desiredState.removeIndicator(indicator.id, indicatorType, indicator.params);
+        desiredState.removeIndicator(context.identity, indicator.id, indicatorType, indicator.params);
         return {
           content: [{ type: 'text' as const, text: `Indicator ${indicatorType} removed.` }],
         };

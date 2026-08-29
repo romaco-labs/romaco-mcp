@@ -91,10 +91,10 @@ describe('chart removal tools resolve user-facing selectors to chart ids', () =>
 
   it('removes only the exact journaled indicator resource', async () => {
     chartState.recordIndicator(
-      { action: 'addIndicator', indicatorType: 'RSI', params: [14] }, 'AAPL', 'rsi-14',
+      { action: 'addIndicator', indicatorType: 'RSI', params: [14] }, AAPL_DAILY, 'rsi-14',
     );
     chartState.recordIndicator(
-      { action: 'addIndicator', indicatorType: 'RSI', params: [50] }, 'AAPL', 'rsi-50',
+      { action: 'addIndicator', indicatorType: 'RSI', params: [50] }, AAPL_DAILY, 'rsi-50',
     );
     vi.spyOn(bridge, 'getContext').mockResolvedValue({
       symbol: 'AAPL', resolution: '1d',

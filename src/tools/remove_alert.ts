@@ -47,7 +47,12 @@ export function registerRemoveAlert(
         };
       }
       if (result.success) {
-        desiredState.removeAlert(alert.id, price, alert.direction ?? direction ?? 'cross');
+        desiredState.removeAlert(
+          context.identity,
+          alert.id,
+          price,
+          alert.direction ?? direction ?? 'cross',
+        );
         return {
           content: [{ type: 'text' as const, text: `Alert at ${price} removed.` }],
         };

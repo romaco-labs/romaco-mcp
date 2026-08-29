@@ -162,7 +162,7 @@ describe('ChartStateJournal — snapshot isolation', () => {
     state.bindResourceId(action, 'rsi-live', identity);
     expect(state.structuralRevision()).toBe(recorded);
 
-    state.removeIndicator('rsi-live', 'RSI', [14]);
+    state.removeIndicator(identity, 'rsi-live', 'RSI', [14]);
     expect(state.structuralRevision()).toBeGreaterThan(recorded);
   });
 });
