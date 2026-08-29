@@ -150,7 +150,73 @@ describe('ReconcileChartStateUseCase', () => {
     const result = await new ReconcileChartStateUseCase(live, state).execute();
 
     expect(result).toMatchObject({ applied: 1, failures: [{ action: 'addIndicator', message: 'host denied' }] });
-    expect(state.snapshot).toHaveBeenCalledOnce();
+    expect(state.snapshot).toHaveBeenCalledTimes(2);
+  });
+
+  it('treats success=false as failure and never binds rejected resources', async () => {
+    const state = desiredState({
+      ...emptySnapshot(),
+      indicators: [{ command: RSI, identity: AAPL, resourceIds: [] }],
+    });
+    const live = chart(AAPL);
+    vi.mocked(live.execute).mockResolvedValue({ success: false, error: 'policy denied' });
+
+    const result = await new ReconcileChartStateUseCase(live, state).execute();
+
+    expect(result).toMatchObject({
+      applied: 0,
+      failures: [{ action: 'addIndicator', message: 'policy denied' }],
+    });
+    expect(state.bindReplayedResources).not.toHaveBeenCalled();
+  });
+
+  it('recaptures desired state after readiness wait so a removed entry stays removed', async () => {
+    const initial = {
+      ...emptySnapshot(),
+      indicators: [{ command: RSI, identity: AAPL, resourceIds: ['rsi-1'] }],
+    };
+    const state = desiredState(initial);
+    vi.mocked(state.snapshot)
+      .mockReturnValueOnce(initial)
+      .mockReturnValueOnce(emptySnapshot());
+    const live = chart(AAPL);
+    vi.mocked(live.getContext)
+      .mockResolvedValueOnce({ identity: AAPL, totalCandles: 0 })
+      .mockResolvedValueOnce({ identity: AAPL, totalCandles: 300 });
+
+    await new ReconcileChartStateUseCase(live, state, async () => undefined)
+      .execute({ attempts: 2, delayMs: 0 });
+
+    expect(state.snapshot).toHaveBeenCalledTimes(2);
+    expect(live.execute).not.toHaveBeenCalled();
+  });
+
+  it('stops and never binds when a newer ready supersedes an in-flight apply', async () => {
+    const initial = {
+      ...emptySnapshot(),
+      indicators: [{ command: RSI, identity: AAPL, resourceIds: [] }],
+      alerts: [{ command: ALERT, identity: AAPL, resourceIds: [] }],
+    };
+    const state = desiredState(initial);
+    vi.mocked(state.snapshot)
+      .mockReturnValueOnce(initial)
+      .mockReturnValueOnce(initial)
+      .mockReturnValueOnce(emptySnapshot());
+    const live = chart(AAPL);
+    let finishApply: ((result: { success: true; resourceIds: string[] }) => void) | undefined;
+    vi.mocked(live.execute).mockImplementationOnce(() => new Promise((resolve) => {
+      finishApply = resolve;
+    }));
+    const useCase = new ReconcileChartStateUseCase(live, state);
+
+    const older = useCase.execute();
+    await vi.waitFor(() => expect(live.execute).toHaveBeenCalledOnce());
+    await expect(useCase.execute()).resolves.toMatchObject({ status: 'empty' });
+    finishApply?.({ success: true, resourceIds: ['late-rsi'] });
+
+    await expect(older).resolves.toMatchObject({ status: 'superseded', applied: 0 });
+    expect(live.execute).toHaveBeenCalledOnce();
+    expect(state.bindReplayedResources).not.toHaveBeenCalled();
   });
 
   it('retries unready chart and cancels older reconciliation generation', async () => {

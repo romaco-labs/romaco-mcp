@@ -115,8 +115,8 @@ export class ReconcileChartStateUseCase {
 
   async execute(options: ReconcileChartStateOptions = {}): Promise<ReconcileChartStateResult> {
     const generation = ++this.generation;
-    const desired = this.desiredState.snapshot();
-    if (stateSize(desired) === 0) return this.result('empty');
+    const initialDesired = this.desiredState.snapshot();
+    if (stateSize(initialDesired) === 0) return this.result('empty');
 
     const attempts = Math.max(1, options.attempts ?? READY_RETRY_ATTEMPTS);
     const delayMs = Math.max(0, options.delayMs ?? READY_RETRY_DELAY_MS);
@@ -146,12 +146,16 @@ export class ReconcileChartStateUseCase {
       };
     }
 
-    return this.applyDesiredState(desired, context);
+    // Desired state can change while chart readiness retries are in flight.
+    // Recapture only after context is ready so removed entries never resurrect.
+    const desired = this.desiredState.snapshot();
+    return this.applyDesiredState(desired, context, generation);
   }
 
   private async applyDesiredState(
     desired: ChartDesiredStateSnapshot,
     context: ChartContext,
+    generation: number,
   ): Promise<ReconcileChartStateResult> {
     let applied = 0;
     let skippedIdentity = 0;
@@ -159,14 +163,17 @@ export class ReconcileChartStateUseCase {
     const apply = async (
       entry: DesiredChartEntry<ReplayableChartCommand>,
       present: boolean,
-    ): Promise<void> => {
+    ): Promise<boolean> => {
+      if (generation !== this.generation) return false;
       if (!sameIdentity(entry.identity, context.identity)) {
         skippedIdentity += 1;
-        return;
+        return true;
       }
-      if (present) return;
+      if (present) return true;
       try {
         const result = await this.chart.execute(entry.command, { expectedIdentity: entry.identity });
+        if (generation !== this.generation) return false;
+        if (!result.success) throw new Error(result.error ?? 'chart rejected action');
         this.desiredState.bindReplayedResources(
           entry.command,
           entry.identity,
@@ -179,12 +186,18 @@ export class ReconcileChartStateUseCase {
           message: error instanceof Error ? error.message : String(error),
         });
       }
+      return generation === this.generation;
     };
 
     for (const entry of desired.indicators) {
-      await apply(entry, hasIndicator(context.indicators ?? [], entry.command));
+      if (!await apply(entry, hasIndicator(context.indicators ?? [], entry.command))) {
+        return { status: 'superseded', applied, skippedIdentity, failures };
+      }
     }
     for (const entry of desired.drawingGroups) {
+      if (generation !== this.generation) {
+        return { status: 'superseded', applied, skippedIdentity, failures };
+      }
       if (!sameIdentity(entry.identity, context.identity)) {
         skippedIdentity += 1;
         continue;
@@ -195,6 +208,10 @@ export class ReconcileChartStateUseCase {
           expectedIdentity: entry.identity,
         };
         const result = await this.chart.replaceDrawingGroup(command);
+        if (generation !== this.generation) {
+          return { status: 'superseded', applied, skippedIdentity, failures };
+        }
+        if (!result.success) throw new Error(result.error ?? 'chart rejected atomic replacement');
         this.desiredState.bindReplayedResources(
           command,
           entry.identity,
@@ -209,10 +226,14 @@ export class ReconcileChartStateUseCase {
       }
     }
     for (const entry of desired.drawings) {
-      await apply(entry, hasDrawing(context.drawings ?? [], entry.command));
+      if (!await apply(entry, hasDrawing(context.drawings ?? [], entry.command))) {
+        return { status: 'superseded', applied, skippedIdentity, failures };
+      }
     }
     for (const entry of desired.alerts) {
-      await apply(entry, hasAlert(context.alerts ?? [], entry.command));
+      if (!await apply(entry, hasAlert(context.alerts ?? [], entry.command))) {
+        return { status: 'superseded', applied, skippedIdentity, failures };
+      }
     }
 
     return { status: 'reconciled', applied, skippedIdentity, failures };
