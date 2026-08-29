@@ -1,15 +1,11 @@
-import { access, mkdir, writeFile } from 'node:fs/promises';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { dirname, resolve } from 'node:path';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { cleanDist } from '../scripts/clean-dist.mjs';
 
-const execFileAsync = promisify(execFile);
-const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const sentinelJavaScript = resolve(projectRoot, 'dist/__deleted_source_sentinel__.js');
-const sentinelDeclaration = resolve(projectRoot, 'dist/__deleted_source_sentinel__.d.ts');
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const projectRoot = resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -21,15 +17,27 @@ async function exists(path: string): Promise<boolean> {
 }
 
 describe('release artifact integrity', () => {
-  it('removes deleted-source sentinels before every build and verifies exact output parity', async () => {
-    await mkdir(resolve(projectRoot, 'dist'), { recursive: true });
-    await writeFile(sentinelJavaScript, 'throw new Error("stale artifact");\n');
-    await writeFile(sentinelDeclaration, 'export declare const stale: true;\n');
+  it('cleans only exact dist output and wires clean verification into build + pack', async () => {
+    const fixtureRoot = await mkdtemp(join(tmpdir(), 'romaco-mcp-clean-'));
+    const sentinelJavaScript = resolve(fixtureRoot, 'dist/__deleted_source_sentinel__.js');
+    const sentinelDeclaration = resolve(fixtureRoot, 'dist/__deleted_source_sentinel__.d.ts');
+    try {
+      await mkdir(resolve(fixtureRoot, 'dist'), { recursive: true });
+      await writeFile(sentinelJavaScript, 'throw new Error("stale artifact");\n');
+      await writeFile(sentinelDeclaration, 'export declare const stale: true;\n');
 
-    await execFileAsync(npmCommand, ['run', 'build', '--silent'], { cwd: projectRoot });
-    expect(await exists(sentinelJavaScript)).toBe(false);
-    expect(await exists(sentinelDeclaration)).toBe(false);
+      await cleanDist(fixtureRoot);
+      expect(await exists(sentinelJavaScript)).toBe(false);
+      expect(await exists(sentinelDeclaration)).toBe(false);
 
-    await execFileAsync(process.execPath, ['scripts/verify-build-artifacts.mjs'], { cwd: projectRoot });
+      const manifest = JSON.parse(await readFile(resolve(projectRoot, 'package.json'), 'utf8')) as {
+        scripts: Record<string, string>;
+      };
+      expect(manifest.scripts.build).toContain('npm run clean');
+      expect(manifest.scripts.prepack).toContain('npm run build');
+      expect(manifest.scripts.prepack).toContain('npm run verify:artifacts');
+    } finally {
+      await rm(fixtureRoot, { recursive: true, force: true });
+    }
   });
 });
