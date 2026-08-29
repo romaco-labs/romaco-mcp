@@ -28,6 +28,8 @@ import { registerGetIndicatorValues } from './tools/get_indicator_values.js';
 import { registerGoToTimestamp } from './tools/go_to_timestamp.js';
 import { createProductionRuntime, type ApplicationRuntime } from './bootstrap/runtime.js';
 import { decorateServerWithToolCatalog } from './adapters/inbound/mcp/catalogDecorator.js';
+import type { ToolTelemetrySink } from './adapters/inbound/mcp/telemetry.js';
+import { createConfiguredToolTelemetrySink } from './bootstrap/telemetry.js';
 
 // Versión SIEMPRE desde package.json — la 0.0.2 hardcodeada quedó
 // desincronizada del paquete publicado (0.0.3) y serverInfo mentía.
@@ -35,14 +37,26 @@ const { version: PKG_VERSION } = createRequire(import.meta.url)('../package.json
   version: string;
 };
 
-export function createServer(runtime: ApplicationRuntime = createProductionRuntime()): McpServer {
+export interface CreateServerOptions {
+  /** null explicitly disables telemetry even when environment opt-in is set. */
+  telemetry?: ToolTelemetrySink | null;
+}
+
+export function createServer(
+  runtime: ApplicationRuntime = createProductionRuntime(),
+  options: CreateServerOptions = {},
+): McpServer {
+  const telemetry = options.telemetry === null
+    ? undefined
+    : options.telemetry ?? createConfiguredToolTelemetrySink();
+  const contractOptions = { telemetry };
   const server = decorateServerWithToolCatalog(new McpServer({
     name: 'romaco',
     version: PKG_VERSION,
   }));
 
   // Browser-bridge tools (require <McpBridge /> in user's app)
-  registerGetChartContext(server, runtime.chart);
+  registerGetChartContext(server, runtime.chart, contractOptions);
   registerGetVisibleCandles(server);
   registerAddIndicator(server);
   registerAddDrawing(server);
@@ -56,22 +70,28 @@ export function createServer(runtime: ApplicationRuntime = createProductionRunti
   registerClearDrawings(server);
 
   // Living Annotations — Phase 0 unlock
-  registerListPanes(server, runtime.chart);
+  registerListPanes(server, runtime.chart, contractOptions);
   registerGetIndicatorValues(server);
   registerGoToTimestamp(server);
 
   // Headless data + analysis tools (no browser required)
   registerListTemplates(server);
-  registerSetupChart(server, runtime.setupChart, runtime.resolveThesis, runtime.presetNames);
-  registerLoadCandles(server, runtime.loadDataset);
+  registerSetupChart(
+    server,
+    runtime.setupChart,
+    runtime.resolveThesis,
+    runtime.presetNames,
+    contractOptions,
+  );
+  registerLoadCandles(server, runtime.loadDataset, contractOptions);
   registerAnalyzeMarket(server);
-  registerThesis(server, runtime.resolveThesis);
+  registerThesis(server, runtime.resolveThesis, contractOptions);
   registerThesisBatch(server);         // multi-symbol ranked analysis
-  registerAnnotate(server, runtime.annotateThesis);
+  registerAnnotate(server, runtime.annotateThesis, contractOptions);
   registerDrawPattern(server, runtime.chart);
   registerFindLevels(server);
   registerDetectPatterns(server);
-  registerCalculatePositionSize(server);
+  registerCalculatePositionSize(server, undefined, contractOptions);
 
   return server;
 }
