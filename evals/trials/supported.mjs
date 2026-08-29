@@ -488,6 +488,102 @@ async function a01() {
   });
 }
 
+async function a02() {
+  const candles = realCandles('AAPL').slice(-120);
+  const identity = { chartId: 'chart_aapl', symbol: 'AAPL', timeframe: '1d' };
+  const groupId = 'romaco-mcp/thesis';
+  const userDrawing = { id: 'user_1', owner: 'user', groupId: null, type: 'trendline' };
+  const agentDrawings = [
+    { id: 'agent_1', owner: 'romaco', groupId, type: 'horizontalLine' },
+    { id: 'agent_2', owner: 'romaco', groupId, type: 'rectangle' },
+  ];
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles, { drawings: [userDrawing, ...agentDrawings] }),
+    execute: async ({ harness, chart, journal }) => {
+      journal.replaceDrawingGroup(groupId, [
+        {
+          action: 'addDrawing', drawingType: 'horizontalLine',
+          points: [{ timestamp: candles.at(-1).timestamp, price: candles.at(-1).close }], groupId,
+        },
+        {
+          action: 'addDrawing', drawingType: 'rectangle',
+          points: [
+            { timestamp: candles.at(-20).timestamp, price: candles.at(-20).low },
+            { timestamp: candles.at(-1).timestamp, price: candles.at(-1).high },
+          ], groupId,
+        },
+      ], identity, 'fixture-clear-plan', ['agent_1', 'agent_2']);
+      const beforeWrites = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const preview = await harness.callTool('romaco_clear_drawings');
+      const afterPreview = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const parameters = approvalParameters(preview);
+      const applied = await harness.callTool('romaco_clear_drawings', {
+        planId: parameters.planId,
+        approvalToken: parameters.approvalToken,
+      });
+      const afterApply = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const replay = await harness.callTool('romaco_clear_drawings', {
+        planId: parameters.planId,
+        approvalToken: parameters.approvalToken,
+      });
+      const afterReplay = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      return {
+        preview,
+        applied,
+        replay,
+        beforeWrites,
+        afterPreview,
+        afterApply,
+        afterReplay,
+        groupId,
+        userDrawingId: userDrawing.id,
+        expectedRemovedCount: agentDrawings.length,
+      };
+    },
+  });
+}
+
+async function a03() {
+  const candles = realCandles('AAPL').slice(-120);
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness, chart }) => {
+      const input = {
+        side: 'long', quantity: 2, stopLoss: 95, takeProfit: 110,
+        idempotencyKey: 'eval-paper-aapl-1',
+      };
+      const beforeWrites = chart.paperPositions.length;
+      const challenge = await harness.callTool('romaco_open_paper_position', input);
+      const afterChallenge = chart.paperPositions.length;
+      const parameters = approvalParameters(challenge);
+      const opened = await harness.callTool('romaco_open_paper_position', {
+        ...input,
+        approvalToken: parameters.approvalToken,
+      });
+      const afterOpened = chart.paperPositions.length;
+      const replay = await harness.callTool('romaco_open_paper_position', input);
+      const afterReplay = chart.paperPositions.length;
+      const changed = await harness.callTool('romaco_open_paper_position', {
+        ...input,
+        quantity: 3,
+      });
+      const afterChanged = chart.paperPositions.length;
+      return {
+        challenge,
+        opened,
+        replay,
+        changed,
+        input,
+        beforeWrites,
+        afterChallenge,
+        afterOpened,
+        afterReplay,
+        afterChanged,
+      };
+    },
+  });
+}
+
 async function s05() {
   const aapl = realCandles('AAPL');
   const tsla = realCandles('TSLA');
@@ -592,5 +688,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['snapshot-gate', l08],
   ['explicit-dataset-race', s05],
   ['annotate-approval', a01],
+  ['clear-preview-apply', a02],
+  ['paper-position-idempotency', a03],
   ['atomic-disconnect-recovery', d02],
 ]);

@@ -5,10 +5,13 @@ import { InMemoryDatasetRepository } from '../../dist/adapters/outbound/persiste
 import { AnnotateThesisUseCase } from '../../dist/application/use-cases/annotateThesis.js';
 import { AnalyzeBatchUseCase } from '../../dist/application/use-cases/analyzeBatch.js';
 import { AddDrawingUseCase } from '../../dist/application/use-cases/addDrawing.js';
+import { ClearAgentDrawingsUseCase } from '../../dist/application/use-cases/clearAgentDrawings.js';
+import { OpenPaperPositionUseCase } from '../../dist/application/use-cases/openPaperPosition.js';
 import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset.js';
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
 import { InMemoryApprovalStore } from '../../dist/adapters/outbound/security/InMemoryApprovalStore.js';
+import { InMemoryPaperPositionIdempotencyStore } from '../../dist/adapters/outbound/persistence/InMemoryPaperPositionIdempotencyStore.js';
 import { chartState } from '../../dist/chartState.js';
 import { createServer } from '../../dist/server.js';
 import { session } from '../../dist/session.js';
@@ -90,6 +93,31 @@ class EvalChartJournal {
       resourceIds: structuredClone(resourceIds ?? []),
     });
   }
+
+  listAgentDrawingGroups(identity) {
+    return [...this.groups.entries()]
+      .filter(([groupId, group]) =>
+        groupId.startsWith('romaco-mcp/')
+        && group.identity.chartId === identity.chartId
+        && group.identity.symbol === identity.symbol
+        && group.identity.timeframe === identity.timeframe
+        && group.identity.datasetId === identity.datasetId,
+      )
+      .map(([groupId, group]) => ({ groupId, drawingCount: group.drawings.length }));
+  }
+
+  removeAgentDrawingGroup(groupId, identity) {
+    const group = this.groups.get(groupId);
+    if (
+      group
+      && group.identity.chartId === identity.chartId
+      && group.identity.symbol === identity.symbol
+      && group.identity.timeframe === identity.timeframe
+      && group.identity.datasetId === identity.datasetId
+    ) {
+      this.groups.delete(groupId);
+    }
+  }
 }
 
 export function createEvalRuntime({ marketData, chart }) {
@@ -112,6 +140,11 @@ export function createEvalRuntime({ marketData, chart }) {
   const setupChart = new SetupChartUseCase(loadDataset, chart, presets, journal);
   const annotateThesis = new AnnotateThesisUseCase(resolveThesis, datasets, chart, journal);
   const addDrawing = new AddDrawingUseCase(chart, new LegacyDrawingTemplateCatalog(), journal);
+  const clearAgentDrawings = new ClearAgentDrawingsUseCase(chart, journal);
+  const openPaperPosition = new OpenPaperPositionUseCase(
+    chart,
+    new InMemoryPaperPositionIdempotencyStore(),
+  );
   const analyzeBatch = new AnalyzeBatchUseCase(
     loadDataset,
     resolveThesis,
@@ -138,6 +171,8 @@ export function createEvalRuntime({ marketData, chart }) {
       journal,
       analyzeBatch,
       addDrawing,
+      clearAgentDrawings,
+      openPaperPosition,
     },
     projection,
     journal,

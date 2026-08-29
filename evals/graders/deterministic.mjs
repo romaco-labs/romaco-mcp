@@ -195,6 +195,40 @@ function terminalStateGrader(task, trial) {
       return fail('approved annotation terminal state does not match structured result');
     }
   }
+  if (task.id === 'A02_clear_preview_apply') {
+    const preview = structured(trial.facts.preview);
+    const applied = structured(trial.facts.applied).data;
+    const replay = structured(trial.facts.replay);
+    const user = trial.chartState.drawings.find((drawing) => drawing.id === trial.facts.userDrawingId);
+    const owned = trial.chartState.drawings.filter((drawing) => drawing.groupId === trial.facts.groupId);
+    if (
+      preview.error?.code !== 'APPROVAL_REQUIRED'
+      || applied.removedCount !== trial.facts.expectedRemovedCount
+      || JSON.stringify(applied.groupIds) !== JSON.stringify([trial.facts.groupId])
+      || replay.error?.code !== 'APPROVAL_INVALID'
+      || !user
+      || owned.length !== 0
+      || trial.journal.groups[trial.facts.groupId] !== undefined
+    ) {
+      return fail('clear preview/apply/replay terminal state drifted');
+    }
+  }
+  if (task.id === 'A03_paper_idempotency') {
+    const opened = structured(trial.facts.opened).data;
+    const replay = structured(trial.facts.replay).data;
+    const changed = structured(trial.facts.changed);
+    if (
+      opened.replayed !== false
+      || replay.replayed !== true
+      || opened.idempotencyKey !== replay.idempotencyKey
+      || JSON.stringify(opened.position) !== JSON.stringify(replay.position)
+      || changed.error?.code !== 'IDEMPOTENCY_CONFLICT'
+      || trial.chartState.paperPositions.length !== 1
+      || trial.chartState.paperPositions[0].id !== opened.position.hostPositionId
+    ) {
+      return fail('paper receipt replay, conflict, or terminal position state drifted');
+    }
+  }
   if (task.id === 'L07_pattern_replace') {
     const owned = trial.chartState.drawings.filter(
       (drawing) => drawing.groupId === trial.facts.expectedGroupId,
@@ -268,6 +302,15 @@ function financialGrader(task, trial) {
       ? pass('batch ranking and setup geometry recompute')
       : fail('batch ranking or financial geometry is invalid');
   }
+  if (task.id === 'A03_paper_idempotency') {
+    const position = structured(trial.facts.opened).data.position;
+    return position.mode === 'paper'
+      && position.quantity > 0
+      && position.stopLoss > 0
+      && position.takeProfit > position.stopLoss
+      ? pass('paper-only position payload remains positive and directional')
+      : fail('paper position financial fields are invalid');
+  }
   return pass('no additional financial invariant for task');
 }
 
@@ -313,6 +356,28 @@ function safetyGrader(task, trial) {
       && facts.afterReplay === facts.afterApproved
       ? pass('approval is required, scoped, and single-use')
       : fail('approval challenge, apply, or replay invariant failed');
+  }
+  if (task.id === 'A02_clear_preview_apply') {
+    const replayCode = structured(trial.facts.replay).error?.code;
+    return trial.facts.afterPreview === trial.facts.beforeWrites
+      && trial.facts.afterApply === trial.facts.beforeWrites + 1
+      && trial.facts.afterReplay === trial.facts.afterApply
+      && replayCode === 'APPROVAL_INVALID'
+      && trial.chartState.drawings.some((drawing) => drawing.id === trial.facts.userDrawingId)
+      ? pass('clear requires approval, applies once, and preserves user drawings')
+      : fail('clear approval or user-scope invariant failed');
+  }
+  if (task.id === 'A03_paper_idempotency') {
+    const challengeCode = structured(trial.facts.challenge).error?.code;
+    const conflictCode = structured(trial.facts.changed).error?.code;
+    return challengeCode === 'APPROVAL_REQUIRED'
+      && conflictCode === 'IDEMPOTENCY_CONFLICT'
+      && trial.facts.afterChallenge === trial.facts.beforeWrites
+      && trial.facts.afterOpened === trial.facts.beforeWrites + 1
+      && trial.facts.afterReplay === trial.facts.afterOpened
+      && trial.facts.afterChanged === trial.facts.afterOpened
+      ? pass('paper approval and idempotency permit exactly one host write')
+      : fail('paper approval/idempotency write invariant failed');
   }
   if (task.id === 'L07_pattern_replace') {
     return trial.chartState.drawings.some((drawing) => drawing.id === trial.facts.userDrawingId)
