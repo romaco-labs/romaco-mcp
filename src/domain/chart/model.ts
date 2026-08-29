@@ -3,6 +3,9 @@ import type { DatasetId, Timeframe } from '../dataset/model.js';
 
 declare const chartIdBrand: unique symbol;
 
+/** Shared ceiling for one chart bridge artifact or wire payload. */
+export const MAX_CHART_TRANSFER_BYTES = 8 * 1024 * 1024;
+
 export type ChartId = string & { readonly [chartIdBrand]: 'ChartId' };
 
 export function createChartId(value: string): ChartId {

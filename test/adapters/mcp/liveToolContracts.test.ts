@@ -54,7 +54,12 @@ function chart(): ChartPort {
       return { success: true };
     },
     replaceDrawingGroup: async () => ({ success: true }),
-    captureSnapshot: async (format) => ({ format, dataUrl: 'data:image/png;base64,ZmFrZQ==' }),
+    captureSnapshot: async (format) => ({
+      format,
+      dataUrl: format === 'jpeg'
+        ? 'data:image/jpeg;base64,/9j/2Q=='
+        : 'data:image/png;base64,iVBORw0KGgo=',
+    }),
   };
 }
 
@@ -182,7 +187,7 @@ describe('live hex MCP output contracts', () => {
     });
     const images = result.content.filter((block) => block.type === 'image');
     expect(images).toHaveLength(1);
-    expect(JSON.stringify(result.structuredContent)).not.toContain('ZmFrZQ==');
+    expect(JSON.stringify(result.structuredContent)).not.toContain('/9j/2Q==');
   });
 
   it('chains indicator reads through exact host indicatorId', async () => {

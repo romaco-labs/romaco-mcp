@@ -71,7 +71,7 @@ export class FakeChartPort {
     drawings = [],
     indicators = [],
     alerts = [],
-    snapshotDataUrl = 'data:image/png;base64,ZmFrZQ==',
+    snapshotDataUrl = 'data:image/png;base64,iVBORw0KGgo=',
     fault = null,
     rawContext = {},
   }) {

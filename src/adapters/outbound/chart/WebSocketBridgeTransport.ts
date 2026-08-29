@@ -3,11 +3,12 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { createBridgeProof, createNonce, isCanonicalNonce, NonceReplayCache, verifyBridgeProof } from './bridgeAuth.js';
 import { BRIDGE_PROTOCOL_VERSION } from './bridgeProtocol.js';
 import type { ActionResult, BridgeAction, BridgeClientMessage, BridgeServerMessage, BridgeTransportConfig, PendingRequest } from './bridgeProtocol.js';
+import { MAX_CHART_TRANSFER_BYTES } from '../../../domain/chart/model.js';
 
 const REQUEST_TIMEOUT_MS = 8_000;
 const REBIND_MS = 5_000;
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-export const BRIDGE_MAX_PAYLOAD_BYTES = 8 * 1024 * 1024;
+export const BRIDGE_MAX_PAYLOAD_BYTES = MAX_CHART_TRANSFER_BYTES;
 
 type ConnectionPhase = 'hello' | 'challenge' | 'authenticated' | 'ready' | 'legacy';
 
