@@ -40,12 +40,19 @@ export function registerDrawPattern(server: McpServer, chart: ChartPort): void {
     },
     async ({ kind, rank }) => {
       // 1. Re-detect locally — same anti-drift principle as romaco_annotate.
-      let candles;
-      try {
-        candles = session.requireCandles();
-      } catch (err) {
-        return { content: [{ type: 'text' as const, text: err instanceof Error ? err.message : String(err) }], isError: true };
+      const load = session.getLastLoad();
+      if (!load) {
+        return {
+          content: [{
+            type: 'text' as const,
+            text: 'No candle data loaded. Call romaco_load_candles first with source, symbol, and timeframe.',
+          }],
+          isError: true,
+        };
       }
+      // Capture candles and identity as one immutable workflow handle before any
+      // await. A concurrent load must not let A geometry validate against B.
+      const candles = load.candles;
       const all = cachedDetectPatterns(candles);
       const recent = selectRecentPatterns(all, candles[0].timestamp, candles[candles.length - 1].timestamp);
       const matching = (kind ? recent.filter((p) => p.kind === kind) : recent).sort(
@@ -90,15 +97,14 @@ export function registerDrawPattern(server: McpServer, chart: ChartPort): void {
         // Sniff instead of hardcoding — raw-source sessions may already be ms.
         if (chartTs > 1e12 && candles[0].timestamp < 1e11) tsScale = 1000;
 
-        const load = session.getLastLoad();
         if (
-          context.identity.symbol !== load?.symbol?.toUpperCase()
-          || context.identity.timeframe !== load?.timeframe
+          context.identity.symbol !== load.symbol.toUpperCase()
+          || context.identity.timeframe !== load.timeframe
         ) {
           return {
             content: [{
               type: 'text' as const,
-              text: `romaco_draw_pattern: chart shows ${context.identity.symbol ?? 'unknown'} ${context.identity.timeframe ?? 'unknown'} but loaded analysis is for ${load?.symbol ?? 'unknown'} ${load?.timeframe ?? 'unknown'}.`,
+              text: `romaco_draw_pattern: chart shows ${context.identity.symbol ?? 'unknown'} ${context.identity.timeframe ?? 'unknown'} but loaded analysis is for ${load.symbol} ${load.timeframe}.`,
             }],
             isError: true,
           };

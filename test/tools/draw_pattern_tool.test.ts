@@ -144,6 +144,40 @@ describe('romaco_draw_pattern', () => {
     }
   });
 
+  it('never pairs captured AAPL geometry with a later concurrent TSLA session', async () => {
+    loadSession(headShouldersCandles(), 'AAPL');
+    let releaseContext!: () => void;
+    let contextRequested!: () => void;
+    const requested = new Promise<void>((resolve) => { contextRequested = resolve; });
+    const release = new Promise<void>((resolve) => { releaseContext = resolve; });
+    vi.mocked(bridge.getContext).mockImplementationOnce(async () => {
+      contextRequested();
+      await release;
+      return {
+        symbol: 'TSLA',
+        resolution: '1h',
+        visibleCandles: [chartCandle(CHART_ANCHOR)],
+      };
+    });
+
+    const { callTool, close } = await createTestClient();
+    try {
+      const drawing = callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
+      await requested;
+      loadSession(headShouldersCandles(), 'TSLA');
+      releaseContext();
+
+      const result = await drawing;
+      expect(result.isError).toBe(true);
+      expect(result.text).toMatch(/TSLA.*AAPL|chart shows/i);
+      expect(allActions()).toHaveLength(0);
+      expect(chartState.snapshot().drawingGroups).toHaveLength(0);
+    } finally {
+      releaseContext();
+      await close();
+    }
+  });
+
   it('does not scale timestamps when the session already holds chart-unit (ms) candles', async () => {
     const msCandles = headShouldersCandles().map((c) => ({ ...c, timestamp: c.timestamp * 1000 }));
     loadSession(msCandles);
