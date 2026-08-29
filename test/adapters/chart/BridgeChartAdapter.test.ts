@@ -158,4 +158,23 @@ describe('BridgeChartAdapter', () => {
       visibleCandles: [{ volume: 0 }],
     });
   });
+
+  it('omits malformed optional overlay observations without breaking concise context reads', async () => {
+    const adapter = new BridgeChartAdapter(transport({
+      getContext: vi.fn(async () => ({
+        symbol: 'AAPL',
+        resolution: '1h',
+        totalCandles: 300,
+        existingIndicators: [{ id: 'rsi-14', name: 'RSI', params: [14] }, {}],
+        existingDrawings: [{ id: 'partial', type: 'trendline', points: [{}, {}] }],
+        alerts: [{}, { id: 'alert-1', price: 100, direction: 'above' }],
+      })),
+    }));
+
+    await expect(adapter.getContext({ includeCandles: false })).resolves.toMatchObject({
+      indicators: [{ id: 'rsi-14', type: 'RSI', params: [14] }],
+      drawings: [],
+      alerts: [{ id: 'alert-1', price: 100, direction: 'above' }],
+    });
+  });
 });

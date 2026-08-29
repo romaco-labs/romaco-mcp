@@ -76,20 +76,20 @@ function record(value: unknown, field: string, index: number): Record<string, un
 }
 
 function parseIndicators(value: unknown): ChartIndicatorState[] {
-  return array(value, 'existingIndicators').map((candidate, index) => {
-    const indicator = record(candidate, 'indicator', index);
-    if (typeof indicator.name !== 'string' || !indicator.name) {
-      throw new Error(`Invalid chart indicator name at index ${index}.`);
+  return array(value, 'existingIndicators').flatMap((candidate, index) => {
+    try {
+      const indicator = record(candidate, 'indicator', index);
+      if (typeof indicator.name !== 'string' || !indicator.name) return [];
+      const params = indicator.params === undefined ? [] : indicator.params;
+      if (!Array.isArray(params) || !params.every(finite)) return [];
+      return [{
+        ...(optionalId(indicator.id, 'indicator id') ? { id: indicator.id as string } : {}),
+        type: indicator.name,
+        params,
+      }];
+    } catch {
+      return [];
     }
-    const params = indicator.params === undefined ? [] : indicator.params;
-    if (!Array.isArray(params) || !params.every(finite)) {
-      throw new Error(`Invalid chart indicator params at index ${index}.`);
-    }
-    return {
-      ...(optionalId(indicator.id, 'indicator id') ? { id: indicator.id as string } : {}),
-      type: indicator.name,
-      params,
-    };
   });
 }
 
@@ -104,32 +104,36 @@ function parseDrawingPoints(value: unknown, index: number) {
 }
 
 function parseDrawings(value: unknown): ChartDrawingState[] {
-  return array(value, 'existingDrawings').map((candidate, index) => {
-    const drawing = record(candidate, 'drawing', index);
-    if (typeof drawing.type !== 'string' || !drawing.type) {
-      throw new Error(`Invalid chart drawing type at index ${index}.`);
+  return array(value, 'existingDrawings').flatMap((candidate, index) => {
+    try {
+      const drawing = record(candidate, 'drawing', index);
+      if (typeof drawing.type !== 'string' || !drawing.type) return [];
+      return [{
+        ...(optionalId(drawing.id, 'drawing id') ? { id: drawing.id as string } : {}),
+        type: drawing.type,
+        points: parseDrawingPoints(drawing.points, index),
+      }];
+    } catch {
+      return [];
     }
-    return {
-      ...(optionalId(drawing.id, 'drawing id') ? { id: drawing.id as string } : {}),
-      type: drawing.type,
-      points: parseDrawingPoints(drawing.points, index),
-    };
   });
 }
 
 function parseAlerts(value: unknown): ChartAlertState[] {
-  return array(value, 'alerts').map((candidate, index) => {
-    const alert = record(candidate, 'alert', index);
-    if (!finite(alert.price)) throw new Error(`Invalid chart alert price at index ${index}.`);
-    const direction = alert.direction ?? 'cross';
-    if (!['above', 'below', 'cross'].includes(direction as string)) {
-      throw new Error(`Invalid chart alert direction at index ${index}.`);
+  return array(value, 'alerts').flatMap((candidate, index) => {
+    try {
+      const alert = record(candidate, 'alert', index);
+      if (!finite(alert.price)) return [];
+      const direction = alert.direction ?? 'cross';
+      if (!['above', 'below', 'cross'].includes(direction as string)) return [];
+      return [{
+        ...(optionalId(alert.id, 'alert id') ? { id: alert.id as string } : {}),
+        price: alert.price,
+        direction: direction as ChartAlertState['direction'],
+      }];
+    } catch {
+      return [];
     }
-    return {
-      ...(optionalId(alert.id, 'alert id') ? { id: alert.id as string } : {}),
-      price: alert.price,
-      direction: direction as ChartAlertState['direction'],
-    };
   });
 }
 
