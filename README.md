@@ -37,7 +37,8 @@ context than returning a large raw OHLCV dump by default.
 | `romaco_get_visible_candles` | <1 KB range summary | ~70 KB raw OHLCV |
 | `romaco_get_indicator_values` | <500 B last/prev/delta/state | ~10 KB per-bar series |
 | `romaco_capture_snapshot` | error (must ack) | 300–800 KB base64 image |
-| `romaco_add_*`, `romaco_set_*`, `romaco_clear_*`, `romaco_go_to_*`, `romaco_open_paper_position` | <100 B ack messages | — |
+| `romaco_clear_drawings`, `romaco_open_paper_position` | <2 KB structured preview/challenge or receipt | — |
+| Other `romaco_add_*`, `romaco_set_*`, `romaco_clear_*`, `romaco_go_to_*` | <1 KB structured result or ack | — |
 
 ## 30-second start
 
@@ -102,11 +103,11 @@ Exposes 20+ MCP tools in two categories:
 - `romaco_add_drawing` — trendlines, Fibonacci, horizontal lines, channels, rectangles
 - `romaco_add_alert` — price alerts with direction (above/below/cross)
 - `romaco_capture_snapshot` — PNG/JPEG base64 for vision LLMs
-- `romaco_open_paper_position` — simulated long/short with SL/TP
+- `romaco_open_paper_position` — approval-gated simulated long/short with SL/TP and deterministic process-local idempotency
 - `romaco_get_chart_context` — concise live chart state; raw chart export is disabled
 - `romaco_get_visible_candles` — OHLCV in current viewport
 - `romaco_set_zoom` / `romaco_reset_view` — zoom control
-- `romaco_clear_drawings` — remove all drawings
+- `romaco_clear_drawings` — preview, approve, then remove only `romaco-mcp/*` groups; user drawings stay intact
 - `romaco_list_panes` — enumerate main + subpanel panes (e.g. RSI subpanel id)
 - `romaco_get_indicator_values` — read computed indicator series (by id or name)
 - `romaco_go_to_timestamp` — scrub viewport to a given timestamp
@@ -197,10 +198,24 @@ Add EMA 20 and RSI 14 to the chart, draw a Fibonacci from the last swing low to 
 and capture a snapshot so I can see it.
 ```
 
-For `romaco_annotate`, first call returns a scoped token and writes nothing. MCP
-rejects missing, expired, wrong-scope, and replayed tokens. Agent/client must send
-the token only after explicit user approval. Token proves completion of the
-two-step protocol; by itself it cannot cryptographically prove human intent.
+`romaco_annotate`, `romaco_clear_drawings`, and
+`romaco_open_paper_position` use two-step confirmation. First call returns a
+scoped token and performs zero chart writes. MCP rejects missing, expired,
+wrong-scope, and replayed tokens. Agent/client must send token only after
+explicit user approval. Token proves completion of protocol; by itself it
+cannot cryptographically prove human intent and never bypasses chart host's
+`actionPolicy`.
+
+Drawing clear scope binds exact chart identity plus current Romaco-managed group
+plan. It never sends global `clearDrawings`; each reserved `romaco-mcp/*` group
+is replaced with empty desired state, leaving user and unrelated groups intact.
+
+Paper positions are visual simulation only: no broker, real order, or money.
+Caller supplies stable `idempotencyKey`. Same completed key/payload returns same
+stored receipt without another chart write; changed payload gets
+`IDEMPOTENCY_CONFLICT`. Journal is memory-only for MCP process. Restart, crash,
+or ambiguous bridge timeout does not provide durable exactly-once execution;
+use chart host audit/idempotency if stronger guarantees become available.
 
 ---
 

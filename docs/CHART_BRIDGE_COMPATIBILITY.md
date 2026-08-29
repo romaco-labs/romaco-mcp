@@ -4,6 +4,9 @@ Headless analysis does not require `romaco-charts`. Live reads and ordinary
 chart actions require `<McpBridge />`. Atomic thesis and pattern annotations
 require a chart host that implements `replaceAgentDrawingGroup`.
 
+Approval tokens are MCP-side capabilities. They never bypass host
+`actionPolicy`; host authorization remains an independent second barrier.
+
 ## Atomic action contract
 
 MCP sends one host action:
@@ -49,6 +52,31 @@ records desired state only after host success. Transport failure, identity
 mismatch, or host rejection produces an MCP error; MCP never degrades to a
 remove-then-add sequence because that can leave half-applied state.
 
+## Approved drawing clear
+
+`romaco_clear_drawings` previews only desired-state groups in reserved
+`romaco-mcp/*` namespace. After one-time approval, MCP sends
+`replaceAgentDrawingGroup` with empty `drawings` for each approved group and
+exact expected identity. It never sends global `clearDrawings`. Hosts must keep
+reserved agent groups isolated from user drawings and reject identity drift.
+
+Multiple approved groups are separate atomic replacements. If later group
+fails, MCP returns `PARTIAL_APPLY`, removes only successful groups from journal,
+and requires fresh preview/approval for remainder.
+
+## Paper position boundary
+
+`romaco_open_paper_position` sends only `openPaperLong` or `openPaperShort` to
+chart host after scoped one-time approval. These actions are simulation/UI
+state, not broker routing. Host must enforce paper-only behavior and its normal
+write policy.
+
+MCP binds caller `idempotencyKey` to exact chart identity and payload. Completed
+same-key/same-payload retry returns stored receipt; changed payload fails closed.
+Store is process-local and memory-only. It prevents duplicate successful calls
+while process survives, but cannot guarantee crash-safe exactly-once semantics
+or resolve response-loss ambiguity. No claim of durable trade execution exists.
+
 ## Compatibility behavior
 
 | Capability | Host requirement | Older host behavior |
@@ -57,6 +85,8 @@ remove-then-add sequence because that can leave half-applied state.
 | Concise chart context and pane reads | `<McpBridge />` identity/context support | explicit bridge error |
 | Basic indicator/drawing/alert actions | corresponding chart actions | host rejection |
 | `romaco_annotate`, atomic pattern drawing | `replaceAgentDrawingGroup` + stable IDs | fails closed |
+| Approved Romaco drawing clear | empty `replaceAgentDrawingGroup` + identity policy | fails closed; never global clear |
+| Approved paper position | paper action + host `actionPolicy` | fails closed; no real trading fallback |
 
 No package version is claimed here until the chart release containing the full
 atomic contract is published and consumer-tested.

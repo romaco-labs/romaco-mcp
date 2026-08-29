@@ -107,6 +107,11 @@ identity. New composed workflows should pass `datasetId` and `analysisId`.
 Price- or timestamp-bound chart writes must fail closed when chart identity does
 not match analysis identity.
 
+High-impact writes use scoped, one-time approval capabilities at MCP inbound
+boundary. Approval does not replace host policy. Paper-position idempotency is a
+process-local adapter contract, not durable exactly-once execution. Drawing
+clear plans target only reserved agent groups and preserve user-owned state.
+
 ## Change workflow
 
 1. Characterize existing behavior with tests.

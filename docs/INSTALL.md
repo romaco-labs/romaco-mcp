@@ -118,12 +118,26 @@ export function Terminal() {
 
 With the bridge connected, the chart-bridge tools become live. If the bridge is not mounted, those tools simply have nothing to talk to — the headless tools keep working regardless.
 
-`romaco_annotate` is intentionally two-step. First call returns
-`APPROVAL_REQUIRED` plus a short-lived token and performs zero chart writes. After
-the user approves that exact `analysisId`, retry with `analysisId` and
-`approvalToken`. Tokens are process-local, scope-bound, single-use, and rejected
-after expiry or replay. Agent/client remains responsible for waiting for actual
-user approval before sending the confirmation token.
+Three high-impact tools are intentionally two-step:
+
+- `romaco_annotate`: approval scope is exact `analysisId`.
+- `romaco_clear_drawings`: first call previews exact chart identity and current
+  `romaco-mcp/*` groups. Retry with returned `planId` and `approvalToken`. Tool
+  never sends global `clearDrawings`, so user-owned drawings remain untouched.
+- `romaco_open_paper_position`: caller must provide `idempotencyKey`. Approval
+  scope includes exact chart identity, side, quantity, SL, TP, and key. Tool is
+  visual paper simulation only; it cannot place real orders.
+
+First call returns `APPROVAL_REQUIRED` plus short-lived token and performs zero
+chart writes. Tokens are process-local, scope-bound, single-use, and rejected
+after expiry, wrong-scope use, or replay. Agent/client remains responsible for
+waiting for actual user approval. Host `actionPolicy` still runs independently;
+MCP approval never overrides host denial.
+
+Completed paper same-key/same-payload retries return stored receipt without new
+chart action. Same key with changed payload returns `IDEMPOTENCY_CONFLICT`.
+Idempotency journal is process-local, not durable: restart, crash, or ambiguous
+bridge timeout cannot promise exactly-once execution.
 
 ## Configuration
 

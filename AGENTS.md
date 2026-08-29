@@ -37,6 +37,8 @@ deterministic market analysis and optional `romaco-charts` control.
 8. Chart writes remain subject to host policy and explicit identity checks.
 9. Legacy root modules and `src/tools/**` are temporary shims. Do not add new
    business logic there.
+10. MCP approval tokens never bypass host `actionPolicy`. Do not claim
+    process-local idempotency is crash-safe or exactly-once.
 
 `test/architecture/dependency_rules.test.ts` enforces dependency direction.
 Update architecture docs and that test together when a boundary changes.
