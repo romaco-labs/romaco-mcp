@@ -70,8 +70,8 @@ function pointsEqual(
 function hasIndicator(
   existing: readonly ChartIndicatorState[],
   wanted: Extract<ChartCommand, { action: 'addIndicator' }>,
-): boolean {
-  return existing.some((candidate) => (
+): ChartIndicatorState | undefined {
+  return existing.find((candidate) => (
     candidate.type.toLowerCase() === wanted.indicatorType.toLowerCase()
     && paramsEqual(candidate.params, wanted.params)
   ));
@@ -80,8 +80,8 @@ function hasIndicator(
 function hasDrawing(
   existing: readonly ChartDrawingState[],
   wanted: Extract<ChartCommand, { action: 'addDrawing' }>,
-): boolean {
-  return existing.some((candidate) => (
+): ChartDrawingState | undefined {
+  return existing.find((candidate) => (
     candidate.type.toLowerCase() === wanted.drawingType.toLowerCase()
     && pointsEqual(candidate.points, wanted.points)
   ));
@@ -90,8 +90,8 @@ function hasDrawing(
 function hasAlert(
   existing: readonly ChartAlertState[],
   wanted: Extract<ChartCommand, { action: 'addAlert' }>,
-): boolean {
-  return existing.some((candidate) => (
+): ChartAlertState | undefined {
+  return existing.find((candidate) => (
     numberEqual(candidate.price, wanted.price)
     && candidate.direction === (wanted.options?.direction ?? 'cross')
   ));
@@ -162,14 +162,23 @@ export class ReconcileChartStateUseCase {
     const failures: ReconcileFailure[] = [];
     const apply = async (
       entry: DesiredChartEntry<ReplayableChartCommand>,
-      present: boolean,
+      present: { id?: string } | undefined,
     ): Promise<boolean> => {
       if (generation !== this.generation) return false;
       if (!sameIdentity(entry.identity, context.identity)) {
         skippedIdentity += 1;
         return true;
       }
-      if (present) return true;
+      if (present) {
+        if (present.id) {
+          this.desiredState.bindReplayedResources(
+            entry.command,
+            entry.identity,
+            [present.id],
+          );
+        }
+        return true;
+      }
       try {
         const result = await this.chart.execute(entry.command, { expectedIdentity: entry.identity });
         if (generation !== this.generation) return false;

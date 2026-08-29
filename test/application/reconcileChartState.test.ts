@@ -134,6 +134,30 @@ describe('ReconcileChartStateUseCase', () => {
     expect(result.applied).toBe(1);
     expect(live.execute).toHaveBeenCalledOnce();
     expect(live.execute).toHaveBeenCalledWith(ALERT, { expectedIdentity: AAPL });
+    expect(state.bindReplayedResources).toHaveBeenCalledWith(RSI, AAPL, ['rsi-live']);
+  });
+
+  it('refreshes matching indicator and alert host IDs without replay writes', async () => {
+    const state = desiredState({
+      ...emptySnapshot(),
+      indicators: [{ command: RSI, identity: AAPL, resourceIds: ['stale-rsi'] }],
+      alerts: [{ command: ALERT, identity: AAPL, resourceIds: ['stale-alert'] }],
+    });
+    const live = chart(AAPL);
+    vi.mocked(live.getContext).mockResolvedValue({
+      identity: AAPL,
+      totalCandles: 300,
+      indicators: [{ id: 'live-rsi', type: 'RSI', params: [14] }],
+      drawings: [],
+      alerts: [{ id: 'live-alert', price: 150, direction: 'above' }],
+    });
+
+    const result = await new ReconcileChartStateUseCase(live, state).execute();
+
+    expect(result).toMatchObject({ applied: 0, failures: [] });
+    expect(live.execute).not.toHaveBeenCalled();
+    expect(state.bindReplayedResources).toHaveBeenCalledWith(RSI, AAPL, ['live-rsi']);
+    expect(state.bindReplayedResources).toHaveBeenCalledWith(ALERT, AAPL, ['live-alert']);
   });
 
   it('keeps desired state after failed apply and continues remaining commands', async () => {
