@@ -14,10 +14,12 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist",
+    "clean": "node scripts/clean-dist.mjs",
+    "verify:artifacts": "node scripts/verify-build-artifacts.mjs",
+    "prepack": "npm run build && npm run verify:artifacts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
