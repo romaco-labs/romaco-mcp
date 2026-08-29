@@ -47,6 +47,7 @@ export function registerAddDrawing(
         'Validate and draw one chart template against exact live chart identity. ' +
         'Call romaco_list_templates for canonical names and required anchor counts. ' +
         'Unknown templates, wrong anchor counts, and non-finite points fail before any chart write. ' +
+        'Drawings always use reserved agent ownership; omitted groupId defaults to romaco-mcp/manual. ' +
         'Successful structured output includes host drawingId when supported.',
       inputSchema: z.object({
         drawingType: z.string().min(1).describe('Canonical template name from romaco_list_templates.'),
@@ -64,7 +65,7 @@ export function registerAddDrawing(
         }).strict().optional(),
         paneId: z.string().optional().describe('Main or indicator pane id from romaco_list_panes.'),
         groupId: z.string().optional().describe(
-          'Optional agent-owned group id in reserved romaco-mcp/<name> namespace. Other namespaces are rejected.',
+          'Agent-owned group in reserved romaco-mcp/<name> namespace. Omit for romaco-mcp/manual.',
         ),
       }),
       dataSchema: addDrawingDataSchema,

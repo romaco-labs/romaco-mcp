@@ -100,7 +100,7 @@ Exposes 20+ MCP tools in two categories:
 
 **Chart-bridge tools** — control a live Romaco chart in the browser:
 - `romaco_add_indicator` — EMA, RSI, MACD, Bollinger, ATR, 29+ indicators
-- `romaco_add_drawing` — trendlines, Fibonacci, horizontal lines, channels, rectangles
+- `romaco_add_drawing` — agent-owned trendlines, Fibonacci, lines, channels, rectangles; omitted group defaults to `romaco-mcp/manual`
 - `romaco_add_alert` — price alerts with direction (above/below/cross)
 - `romaco_clear_alerts` — preview, approve, then remove exact alert IDs from one chart; never sends global clear
 - `romaco_capture_snapshot` — PNG/JPEG base64 for vision LLMs

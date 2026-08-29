@@ -83,12 +83,12 @@ export class AddDrawingUseCase {
     }
     // Validate all host-owned template invariants before reading identity or writing.
     validatePoints(template.name, input.points, template.pointCount);
-    const groupId = input.groupId?.trim();
-    if (groupId !== undefined && (
+    const groupId = (input.groupId ?? `${AGENT_GROUP_PREFIX}manual`).trim();
+    if (
       !groupId.startsWith(AGENT_GROUP_PREFIX)
       || groupId.length === AGENT_GROUP_PREFIX.length
       || groupId.length > MAX_GROUP_ID_LENGTH
-    )) {
+    ) {
       throw new ApplicationError(
         'INVALID_ARGUMENT',
         `Agent drawing groupId must use ${AGENT_GROUP_PREFIX}<name> and contain at most ${MAX_GROUP_ID_LENGTH} characters.`,
@@ -116,7 +116,7 @@ export class AddDrawingUseCase {
       ...(input.label !== undefined ? { label: input.label } : {}),
       ...(input.style !== undefined ? { style: input.style } : {}),
       ...(input.paneId !== undefined ? { paneId: input.paneId } : {}),
-      ...(groupId !== undefined ? { groupId } : {}),
+      groupId,
     };
     const result = await this.chart.execute(drawing, { expectedIdentity: identity });
     if (!result.success) {

@@ -64,7 +64,9 @@ describe('romaco_add_drawing structured contract', () => {
       data: {
         drawingId: 'drawing_fib_1',
         applied: true,
-        drawing: { id: 'drawing_fib_1', type: 'fibRetracement', pointCount: 2 },
+        drawing: {
+          id: 'drawing_fib_1', type: 'fibRetracement', pointCount: 2, groupId: 'romaco-mcp/manual',
+        },
         identity,
       },
       context: identity,

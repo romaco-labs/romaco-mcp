@@ -59,6 +59,9 @@ remove-then-add sequence because that can leave half-applied state.
 `replaceAgentDrawingGroup` with empty `drawings` for each approved group and
 exact expected identity. It never sends global `clearDrawings`. Hosts must keep
 reserved agent groups isolated from user drawings and reject identity drift.
+`romaco_add_drawing` always records the same ownership boundary: omitted
+`groupId` becomes `romaco-mcp/manual`, and non-reserved explicit groups fail
+before chart access. Thus manual agent drawings remain attributable and clearable.
 
 Multiple approved groups are separate atomic replacements. If later group
 fails, MCP returns `PARTIAL_APPLY`, removes only successful groups from journal,

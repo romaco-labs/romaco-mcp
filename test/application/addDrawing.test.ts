@@ -106,6 +106,28 @@ describe('AddDrawingUseCase', () => {
     );
   });
 
+  it('assigns omitted group ownership to the stable manual agent group', async () => {
+    const live = chart();
+    const recordDrawing = vi.fn();
+    const useCase = new AddDrawingUseCase(live, templates, { recordDrawing });
+
+    const result = await useCase.execute({
+      drawingType: 'path',
+      points: [{ timestamp: 1, price: 100 }],
+    });
+
+    expect(result.drawing.groupId).toBe('romaco-mcp/manual');
+    expect(live.execute).toHaveBeenCalledWith(
+      expect.objectContaining({ groupId: 'romaco-mcp/manual' }),
+      expect.anything(),
+    );
+    expect(recordDrawing).toHaveBeenCalledWith(
+      expect.objectContaining({ groupId: 'romaco-mcp/manual' }),
+      expect.anything(),
+      'drawing_fib_1',
+    );
+  });
+
   it('writes canonical template once, returns exact host id, and journals success', async () => {
     const live = chart();
     const recordDrawing = vi.fn();
@@ -119,11 +141,13 @@ describe('AddDrawingUseCase', () => {
     expect(result).toMatchObject({
       drawingId: 'drawing_fib_1',
       chartIdentity: { chartId: 'chart_aapl', symbol: 'AAPL', timeframe: '1d' },
-      drawing: { drawingType: 'fibRetracement', points },
+      drawing: { drawingType: 'fibRetracement', points, groupId: 'romaco-mcp/manual' },
     });
     expect(live.execute).toHaveBeenCalledOnce();
     expect(live.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'addDrawing', drawingType: 'fibRetracement', points }),
+      expect.objectContaining({
+        action: 'addDrawing', drawingType: 'fibRetracement', points, groupId: 'romaco-mcp/manual',
+      }),
       { expectedIdentity: { chartId: 'chart_aapl', symbol: 'AAPL', timeframe: '1d' } },
     );
     expect(recordDrawing).toHaveBeenCalledWith(
