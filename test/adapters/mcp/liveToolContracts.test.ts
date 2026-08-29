@@ -35,7 +35,7 @@ function chart(): ChartPort {
       },
     }),
     execute: async (command) => command.action === 'listPanes'
-      ? { success: true, data: [{ id: 'main', alias: 'main', indicators: [] }] }
+      ? { success: true, data: { panes: [{ id: 'main', alias: 'main', indicators: [] }] } }
       : { success: true },
     replaceDrawingGroup: async () => ({ success: true }),
     captureSnapshot: async (format) => ({ format, dataUrl: 'data:image/png;base64,ZmFrZQ==' }),

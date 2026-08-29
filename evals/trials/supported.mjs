@@ -188,7 +188,16 @@ async function l02() {
     chart: connectedChart('AAPL', '1d', candles),
     execute: async ({ harness }) => {
       const context = await harness.callTool('romaco_get_chart_context');
-      return { context, expectedChartId: 'chart_aapl', expectedCandleCount: candles.length };
+      const deniedRaw = await harness.callTool('romaco_get_chart_context', {
+        acknowledgeHighTokenCost: true,
+      });
+      return {
+        context,
+        deniedRaw,
+        expectedChartId: 'chart_aapl',
+        expectedCandleCount: candles.length,
+        expectedErrorCode: 'ACTION_DENIED',
+      };
     },
   });
 }

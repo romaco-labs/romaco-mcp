@@ -112,11 +112,11 @@
     "split": "dev",
     "category": "live",
     "status": "runnable",
-    "prompt": "Inspect the current AAPL chart efficiently. Return raw chart state only after explicit high-token-cost acknowledgement.",
+    "prompt": "Inspect the current AAPL chart efficiently, then verify that raw chart-state export remains denied without an authorized host integration.",
     "oracleWorkflow": "context-cost-gate",
     "fixtureRefs": ["chart-aapl"],
-    "graderRefs": ["contract", "tool-policy", "budget"],
-    "expectedOutcomes": ["default context is concise", "raw candles are absent by default", "acknowledged raw result is labeled"],
+    "graderRefs": ["contract", "tool-policy", "recovery", "budget"],
+    "expectedOutcomes": ["default context is concise", "raw candles are absent by default", "acknowledged raw request returns ACTION_DENIED with recovery"],
     "budget": { "maxToolCalls": 3, "maxResultBytes": 90000, "maxDurationMs": 2000 }
   },
   {

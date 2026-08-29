@@ -24,15 +24,17 @@ export function registerListPanes(
         const identity = await chart.getIdentity();
         const result = await chart.execute({ action: 'listPanes' }, { expectedIdentity: identity });
         if (!result.success) throw new Error(result.error ?? 'Chart rejected listPanes.');
-        if (!Array.isArray(result.data) || !result.data.every(
+        const payload = result.data as { panes?: unknown } | undefined;
+        if (!payload || typeof payload !== 'object' || !Array.isArray(payload.panes) || !payload.panes.every(
           (pane) => typeof pane === 'object' && pane !== null && !Array.isArray(pane),
         )) {
           throw new ApplicationError('INTERNAL', 'Chart returned an invalid pane list.');
         }
-        const panes = result.data as Array<Record<string, unknown>>;
+        const panes = payload.panes as Array<Record<string, unknown>>;
         return {
           data: { chartId: identity.chartId, panes },
-          summary: JSON.stringify(panes, null, 2),
+          // Preserve ChartAgentController's legacy `{ panes }` text shape.
+          summary: JSON.stringify({ panes }, null, 2),
           context: {
             chartId: identity.chartId,
             symbol: identity.symbol,

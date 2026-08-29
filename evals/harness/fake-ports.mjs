@@ -173,7 +173,10 @@ export class FakeChartPort {
         return { success: true, data: { id }, resourceIds: [id] };
       }
       case 'listPanes':
-        return { success: true, data: [{ id: 'main', alias: 'main', indicators: copy(this.indicators) }] };
+        return {
+          success: true,
+          data: { panes: [{ id: 'main', alias: 'main', indicators: copy(this.indicators) }] },
+        };
       case 'getIndicatorValues':
         return { success: true, data: { indicatorId: command.indicatorId, series: [] } };
       default:

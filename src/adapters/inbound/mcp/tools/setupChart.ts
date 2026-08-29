@@ -61,9 +61,15 @@ export function registerSetupChart(
           `✓ Loaded ${dataset.candles.length} candles — ${dataset.symbol} ${dataset.timeframe} via ${dataset.source}`,
           `  datasetId=${dataset.datasetId}`,
           `  analysisId=${artifact.analysisId} provider=${artifact.provider}`,
-          `  Range: ${new Date(first.timestamp * 1000).toISOString().slice(0, 10)} → ${new Date(last.timestamp * 1000).toISOString().slice(0, 10)}`,
-          `  Last close: ${last.close.toFixed(2)}`,
         ];
+        if (first && last) {
+          lines.push(
+            `  Range: ${new Date(first.timestamp * 1000).toISOString().slice(0, 10)} → ${new Date(last.timestamp * 1000).toISOString().slice(0, 10)}`,
+            `  Last close: ${last.close.toFixed(2)}`,
+          );
+        } else {
+          lines.push('  No candles returned.');
+        }
 
         if (result.liveStatus === 'disconnected') {
           lines.push('\n⚠ No browser connected — preset not applied. Headless analysis is ready.');
