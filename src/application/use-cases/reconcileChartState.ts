@@ -200,6 +200,7 @@ interface GroupCompensationDebt {
   key: string;
   entry: DesiredChartEntry<ReplaceDrawingGroupCommand>;
   resourceIds: readonly string[];
+  hostState: 'present' | 'unknown';
 }
 
 type CompensationDebt = IndividualCompensationDebt | GroupCompensationDebt;
@@ -386,7 +387,7 @@ export class ReconcileChartStateUseCase {
         applied += 1;
       } catch (error) {
         if (revision !== this.desiredState.structuralRevision()) {
-          failures.push(...await this.compensateStaleGroup(entry, []));
+          failures.push(...await this.compensateStaleGroup(entry, [], 'unknown'));
           return { status: interruptedStatus(), applied, skippedIdentity, failures };
         }
         if (!isCurrent()) return { status: 'superseded', applied, skippedIdentity, failures };
@@ -445,12 +446,14 @@ export class ReconcileChartStateUseCase {
   private async compensateStaleGroup(
     entry: DesiredChartEntry<ReplaceDrawingGroupCommand>,
     resourceIds: readonly string[],
+    hostState: GroupCompensationDebt['hostState'] = 'present',
   ): Promise<ReconcileFailure[]> {
     const debt: GroupCompensationDebt = {
       kind: 'group',
       key: `group:${entry.entryId}:${entry.entryVersion}`,
       entry,
       resourceIds,
+      hostState,
     };
     const failure = await this.resolveGroupDebt(debt);
     if (!failure) return [];
@@ -587,6 +590,7 @@ export class ReconcileChartStateUseCase {
       try {
         if (
           current
+          && debt.hostState === 'present'
           && current.entryId === debt.entry.entryId
           && current.entryVersion === debt.entry.entryVersion
           && drawingGroupPayloadEqual(current.command, debt.entry.command)

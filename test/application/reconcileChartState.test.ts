@@ -488,6 +488,39 @@ describe('ReconcileChartStateUseCase', () => {
     expect(vi.mocked(live.replaceDrawingGroup).mock.calls[1][0].drawings).toEqual([]);
   });
 
+  it('reasserts a current atomic group after ambiguous response loss and unrelated revision drift', async () => {
+    const state = new ChartStateJournal();
+    const journal = new LegacyChartJournal(state);
+    journal.replaceDrawingGroup(GROUP.groupId, GROUP.drawings, AAPL, GROUP.idempotencyKey);
+    let hostDrawings: ReplaceDrawingGroupCommand['drawings'] = [];
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>((resolve) => { releaseOld = resolve; });
+    const live = chart(AAPL);
+    let replacementCount = 0;
+    vi.mocked(live.replaceDrawingGroup).mockImplementation(async (command) => {
+      replacementCount += 1;
+      if (replacementCount === 1) {
+        await oldGate;
+        hostDrawings = command.drawings;
+        throw new Error('response lost after atomic host apply');
+      }
+      hostDrawings = command.drawings;
+      return { success: true, resourceIds: ['fresh-group-drawing'] };
+    });
+
+    const pending = new ReconcileChartStateUseCase(live, journal).execute();
+    await vi.waitFor(() => expect(live.replaceDrawingGroup).toHaveBeenCalledOnce());
+    journal.recordAlert(ALERT, AAPL, 'unrelated-alert');
+    releaseOld();
+
+    await expect(pending).resolves.toMatchObject({ status: 'superseded', failures: [] });
+    expect(hostDrawings).toEqual(journal.snapshot().drawingGroups[0].command.drawings);
+    expect(live.replaceDrawingGroup).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(live.replaceDrawingGroup).mock.calls[1][0].idempotencyKey)
+      .not.toBe(GROUP.idempotencyKey);
+    expect(journal.snapshot().drawingGroups[0].resourceIds).toEqual(['fresh-group-drawing']);
+  });
+
   it('uses entry CAS so remove + re-add never receives the stale host resource id', async () => {
     const state = new ChartStateJournal();
     const journal = new LegacyChartJournal(state);
