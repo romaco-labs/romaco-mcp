@@ -1,10 +1,20 @@
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { createTestClient } from './_client.js';
 import { session } from '../../src/session.js';
+import { bridge } from '../../src/bridge.js';
 
 type Harness = Awaited<ReturnType<typeof createTestClient>>;
 
 const SIZE_BUDGET_BYTES = 2000;
+
+const visibleCandles = Array.from({ length: 500 }, (_, i) => ({
+  timestamp: 1_700_000_000 + i * 60,
+  open: 100 + i * 0.1,
+  high: 100.5 + i * 0.1,
+  low: 99.5 + i * 0.1,
+  close: 100.2 + i * 0.1,
+  volume: 1_000 + i,
+}));
 
 describe('gated tools — default (no ack) output stays under budget', () => {
   let h: Harness;
@@ -15,30 +25,54 @@ describe('gated tools — default (no ack) output stays under budget', () => {
   });
   afterEach(async () => {
     await h.close();
+    vi.restoreAllMocks();
   });
 
-  it('romaco_get_chart_context: <2KB without ack', async () => {
-    // No browser bridge connected in test → tool will error with "No chart connected".
-    // That's the no-ack path: a small error message, which is well under budget.
+  it('romaco_get_chart_context: successful default payload stays <2KB', async () => {
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({
+      visibleRange: { startTimestamp: 1, endTimestamp: 2, startIndex: 0, endIndex: 499 },
+      visibleCandles,
+      existingDrawings: new Array(30).fill({ id: 'd1', type: 'trendline', points: [{}, {}] }),
+      existingIndicators: new Array(10).fill({ id: 'i1', name: 'RSI', params: [14], visible: true }),
+      panels: [{ id: 'main', alias: 'main', indicators: [] }],
+      currentPrice: 150.1,
+      totalCandles: 500,
+      zoomLevel: 1.2,
+      renderBackend: 'webgpu',
+      alerts: [{}, {}],
+      paperTrading: null,
+    });
     const res = await h.callTool('romaco_get_chart_context', {});
-    expect(res.text.length).toBeLessThan(SIZE_BUDGET_BYTES);
+    expect(res.isError).toBe(false);
+    expect(Buffer.byteLength(res.text, 'utf8')).toBeLessThan(SIZE_BUDGET_BYTES);
   });
 
-  it('romaco_get_visible_candles: <2KB without ack', async () => {
+  it('romaco_get_visible_candles: successful default payload stays <2KB', async () => {
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({ visibleCandles });
     const res = await h.callTool('romaco_get_visible_candles', {});
-    expect(res.text.length).toBeLessThan(SIZE_BUDGET_BYTES);
+    expect(res.isError).toBe(false);
+    expect(Buffer.byteLength(res.text, 'utf8')).toBeLessThan(SIZE_BUDGET_BYTES);
   });
 
-  it('romaco_get_indicator_values: <2KB without ack', async () => {
+  it('romaco_get_indicator_values: successful default payload stays <2KB', async () => {
+    vi.spyOn(bridge, 'executeAction').mockResolvedValue({
+      success: true,
+      data: {
+        name: 'RSI',
+        params: [14],
+        series: [{ key: 'value', values: Array.from({ length: 1_000 }, (_, i) => i % 100) }],
+      },
+    });
     const res = await h.callTool('romaco_get_indicator_values', { indicatorName: 'RSI' });
-    expect(res.text.length).toBeLessThan(SIZE_BUDGET_BYTES);
+    expect(res.isError).toBe(false);
+    expect(Buffer.byteLength(res.text, 'utf8')).toBeLessThan(SIZE_BUDGET_BYTES);
   });
 
   it('romaco_capture_snapshot: refuses without ack and stays tiny', async () => {
     const res = await h.callTool('romaco_capture_snapshot', {});
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/acknowledgeHighTokenCost/);
-    expect(res.text.length).toBeLessThan(SIZE_BUDGET_BYTES);
+    expect(Buffer.byteLength(res.text, 'utf8')).toBeLessThan(SIZE_BUDGET_BYTES);
   });
 
   it('romaco_detect_patterns: <2KB without ack on realistic data', async () => {
@@ -59,7 +93,7 @@ describe('gated tools — default (no ack) output stays under budget', () => {
     });
     const res = await h.callTool('romaco_detect_patterns', {});
     expect(res.isError).toBe(false);
-    expect(res.text.length).toBeLessThan(SIZE_BUDGET_BYTES);
+    expect(Buffer.byteLength(res.text, 'utf8')).toBeLessThan(SIZE_BUDGET_BYTES);
     // Must not include points[] arrays
     expect(res.text).not.toMatch(/"role"/);
     expect(res.text).not.toMatch(/"points":/);

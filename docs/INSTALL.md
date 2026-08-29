@@ -6,7 +6,7 @@
 
 ## Prerequisites
 
-- **Node.js >= 18** (the server is published as ESM and run with `npx`)
+- **Node.js >= 20** (the server is published as ESM and run with `npx`)
 - **An MCP client** — for example Claude Code, Claude Desktop, or Cursor
 
 You do **not** need a global install. The examples below run the server on demand with `npx`.
@@ -127,7 +127,7 @@ All configuration is via environment variables. Set them in your MCP client's se
 | `ROMACO_CACHE_DIR` | `~/.romaco/cache` | On-disk cache directory for yfinance data, with a per-timeframe TTL. |
 | `ROMACO_APP_URL` | _(empty)_ | Optional. A chart-app URL the server can auto-open when no bridge is connected. |
 | `ROMACO_TOKEN` | _(empty)_ | Empty = Free. Set it to enable Pro (delegates heavy compute to the backend). |
-| `ROMACO_API_URL` | `http://localhost:8000` | Pro backend endpoint (dev default). Set to `https://api.romaco.tech` for the hosted backend. |
+| `ROMACO_API_URL` | `http://localhost:8000` | Pro backend endpoint (dev default). Point it at your self-hosted ROA-I backend — hosted tier coming soon. |
 
 To set them, add an `env` block to your server config:
 

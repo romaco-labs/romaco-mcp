@@ -3,8 +3,9 @@
 Engine refactor focused on measured performance and pattern-count scalability.
 Golden rule throughout: **the LLM never reads candle arrays** — all compute
 lives in the TypeScript backend, tools return verdicts (`trimPatternHits`,
-compressed summaries; `gated_tools_default_size.test.ts` enforces <2 KB
-payloads in CI).
+compressed summaries). CI enforces the documented budgets: selected default
+tool payloads stay below 2 KB, the thesis stays below 2 KB, and recorded
+400-bar `analyze_market` summaries stay below 4.5 KB.
 
 ## What v2 is (and is not)
 

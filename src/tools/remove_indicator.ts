@@ -16,7 +16,20 @@ export function registerRemoveIndicator(server: McpServer): void {
       },
     },
     async ({ indicatorType }) => {
-      const result = await bridge.executeAction({ action: 'removeIndicator', indicatorType });
+      const context = (await bridge.getContext(false)) as {
+        existingIndicators?: Array<{ id?: string; name?: string }>;
+      };
+      const indicator = context.existingIndicators?.find(
+        (candidate) => candidate.name?.toLowerCase() === indicatorType.toLowerCase(),
+      );
+      if (!indicator?.id) {
+        return {
+          content: [{ type: 'text' as const, text: `Indicator ${indicatorType} not found.` }],
+          isError: true,
+        };
+      }
+
+      const result = await bridge.executeAction({ action: 'removeIndicator', indicatorId: indicator.id });
       if (result.success) {
         chartState.removeIndicator(indicatorType);
         return {

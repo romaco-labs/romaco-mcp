@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { composeMarketSummary } from '../../src/compression/summary.js';
 import { uptrendCandles, downtrendCandles, sidewaysCandles, headShouldersCandles } from './fixtures.js';
+import { realCandles } from './real_fixtures.js';
+
+const REAL_FIXTURE_SYMBOLS = ['TSLA', 'XOM', 'AAPL', 'MSTR', 'SPY', 'META', 'KO', 'JPM'] as const;
 
 describe('composeMarketSummary', () => {
   it('returns full MarketSummary structure', () => {
@@ -57,12 +60,18 @@ describe('composeMarketSummary', () => {
     expect(json.length).toBeLessThan(25_000);
   });
 
-  it('100x compression: 1000 candles → summary < raw size / 100', () => {
+  it('compresses 1000 candles by at least 20x', () => {
     const candles = uptrendCandles(1000, 100, 0.5, 1);
     const rawSize = JSON.stringify(candles).length;
     const summary = composeMarketSummary(candles);
     const summarySize = JSON.stringify(summary).length;
-    // Should be at least 20x smaller (often much more)
     expect(summarySize).toBeLessThan(rawSize / 20);
+  });
+
+  it('keeps every recorded 400-bar market summary under the documented 4.5 KB budget', () => {
+    for (const symbol of REAL_FIXTURE_SYMBOLS) {
+      const summary = JSON.stringify(composeMarketSummary(realCandles(symbol)));
+      expect(Buffer.byteLength(summary, 'utf8'), symbol).toBeLessThan(4_500);
+    }
   });
 });
