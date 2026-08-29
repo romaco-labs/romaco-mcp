@@ -63,10 +63,11 @@ import { useRef } from 'react';
 
 function App() {
   const ref = useRef<TradingTerminalRef | null>(null);
+  const bridgeToken = getBridgeTokenFromRuntime();
   return (
     <>
       <TradingTerminal ref={ref} data={candles} symbol="AAPL" />
-      <McpBridge chartRef={ref} />
+      <McpBridge chartRef={ref} security={{ mode: 'paired', token: bridgeToken }} />
     </>
   );
 }
@@ -175,10 +176,11 @@ import { TradingTerminal, McpBridge } from 'romaco-charts/react';
 
 function App() {
   const ref = useRef(null);
+  const bridgeToken = getBridgeTokenFromRuntime();
   return (
     <>
       <TradingTerminal ref={ref} symbol="AAPL" timeframe="1h" datafeed={myDatafeed} />
-      <McpBridge chartRef={ref} />
+      <McpBridge chartRef={ref} security={{ mode: 'paired', token: bridgeToken }} />
     </>
   );
 }
@@ -208,15 +210,33 @@ and capture a snapshot so I can see it.
 | Option | Default | How to set |
 |--------|---------|-----------|
 | WebSocket port | `7399` | `--port 3200` or `ROMACO_MCP_PORT=3200` |
+| `ROMACO_MCP_BRIDGE_AUTH` | `auto` | `auto`, `required`, or explicit `legacy` compatibility mode |
+| `ROMACO_MCP_BRIDGE_TOKEN` | _(none)_ | Canonical base64url encoding of exactly 32 random bytes |
 | `ROMACO_TOKEN` | _(none → free)_ | Unlocks Pro against a self-hosted ROA-I backend (hosted tier coming soon) |
 | `ROMACO_API_URL` | `http://localhost:8000` | ROA-I backend endpoint (self-hosted) |
-| `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + romaco.io)_ | Comma-separated origins for `<McpBridge />` pages on other domains |
+| `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + `https://romaco.io`)_ | Comma-separated exact HTTP(S) origins for `<McpBridge />` pages on other domains |
 
-**Bridge security**: the WebSocket bridge binds to `127.0.0.1` only (never network-visible) and rejects browser connections from unknown origins — a malicious webpage in your browser can't reach the chart. If your app embeds `<McpBridge />` on its own domain, allow it explicitly:
+**Bridge security**: paired v2 mutually authenticates server and browser with
+HMAC-SHA-256 before chart traffic. Token never crosses WebSocket. Generate one
+once, configure MCP process, inject same value into `<McpBridge />` at runtime:
 
 ```bash
-ROMACO_MCP_ALLOWED_ORIGINS="https://myapp.com" npx @romaco/mcp
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+
+ROMACO_MCP_BRIDGE_AUTH=required \
+ROMACO_MCP_BRIDGE_TOKEN="<generated-token>" \
+ROMACO_MCP_ALLOWED_ORIGINS="https://myapp.com" \
+npx @romaco/mcp
 ```
+
+Never put token in source, public bundle, URL, logs, or browser storage. Use
+in-memory input for current page lifetime. `auto` selects paired v2 with valid
+token; no token keeps legacy v1 with warning. Malformed configured token
+disables only chart bridge. `required` never falls back to v1.
+
+Listener binds `127.0.0.1`; exact origins add defense in depth. Localhost pages
+still need pairing token. Frames are not encrypted. Never expose listener
+remotely; use authenticated TLS gateway for non-loopback deployments.
 
 ```bash
 # Custom port

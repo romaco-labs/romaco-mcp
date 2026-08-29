@@ -105,11 +105,12 @@ import { TradingTerminal, McpBridge, type TradingTerminalRef } from 'romaco-char
 
 export function Terminal() {
   const chartRef = useRef<TradingTerminalRef | null>(null);
+  const bridgeToken = getBridgeTokenFromRuntime();
 
   return (
     <>
       <TradingTerminal ref={chartRef} symbol="AAPL" />
-      <McpBridge chartRef={chartRef} />
+      <McpBridge chartRef={chartRef} security={{ mode: 'paired', token: bridgeToken }} />
     </>
   );
 }
@@ -124,6 +125,9 @@ All configuration is via environment variables. Set them in your MCP client's se
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `ROMACO_MCP_PORT` | `7399` | WebSocket port the live-chart bridge connects on. Must match the `port` prop on `<McpBridge />`. |
+| `ROMACO_MCP_BRIDGE_AUTH` | `auto` | `auto` selects paired v2 with a valid token; `required` fails closed; `legacy` enables v1. |
+| `ROMACO_MCP_BRIDGE_TOKEN` | _(empty)_ | Pairing secret: exactly 32 random bytes encoded as canonical base64url. |
+| `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + `https://romaco.io`)_ | Extra comma-separated exact HTTP(S) origins. No wildcards. |
 | `ROMACO_CACHE_DIR` | `~/.romaco/cache` | On-disk cache directory for yfinance data, with a per-timeframe TTL. |
 | `ROMACO_APP_URL` | _(empty)_ | Optional. A chart-app URL the server can auto-open when no bridge is connected. |
 | `ROMACO_TOKEN` | _(empty)_ | Empty = Free. Set it to enable Pro (delegates heavy compute to the backend). |
@@ -147,6 +151,39 @@ To set them, add an `env` block to your server config:
 ```
 
 You can also pass the port as a flag: `npx -y @romaco/mcp --port 3200`.
+
+### Pair the live chart
+
+Generate one secret and provide same value to both endpoints:
+
+```bash
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "romaco": {
+      "command": "npx",
+      "args": ["-y", "@romaco/mcp"],
+      "env": {
+        "ROMACO_MCP_BRIDGE_AUTH": "required",
+        "ROMACO_MCP_BRIDGE_TOKEN": "<generated-token>"
+      }
+    }
+  }
+}
+```
+
+Inject value into `<McpBridge security={{ mode: 'paired', token }} />` at
+runtime. Never commit it or put it in public JS bundle, URL, logs, or browser
+storage. Use in-memory input for current page lifetime.
+
+`auto` without token preserves legacy compatibility and logs warning.
+`required` without valid token disables chart bridge; headless tools stay
+available. Paired mode never falls back to legacy after failed handshake.
 
 ## Free vs Pro
 

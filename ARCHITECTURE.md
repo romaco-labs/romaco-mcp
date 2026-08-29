@@ -56,6 +56,15 @@ maps its result to the transport contract. `src/adapters/outbound/**` implements
 application ports for persistence, market data, chart control, gateways, and OS
 integration.
 
+Optional browser bridge stays in `src/adapters/outbound/chart/**`:
+
+- `bridgeProtocol.ts`: wire DTOs and versioning;
+- `bridgeAuth.ts`: pairing proofs, nonce validation, replay defense;
+- `WebSocketBridgeTransport.ts`: loopback lifecycle and request correlation.
+
+Environment parsing and construction stay in `src/bootstrap/**`.
+`src/bridge.ts` remains a compatibility shim only.
+
 ### Composition root
 
 Runtime construction belongs in `src/bootstrap/**` and process startup belongs
