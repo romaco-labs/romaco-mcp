@@ -15,7 +15,7 @@ const thesisPointSchema = z.object({
   detail: z.string(),
 }).strict();
 
-const tradeSetupSchema = z.object({
+export const tradeSetupSchema = z.object({
   entry: z.number(),
   stop: z.number(),
   target: z.number(),
@@ -195,6 +195,33 @@ export const thesisDataSchema = z.object({
   provider: z.enum(['local', 'gateway']),
   thesis: tradeThesisSchema,
   disclaimer: z.string(),
+}).strict();
+
+export const batchThesisItemSchema = z.object({
+  symbol: z.string().min(1),
+  timeframe: timeframeSchema,
+  datasetId: z.string().min(1),
+  analysisId: z.string().min(1),
+  verdict: z.enum(['long', 'short', 'stand_aside']),
+  confidence: z.number().min(0).max(1),
+  score: z.number().finite(),
+  setup: tradeSetupSchema.nullable(),
+}).strict();
+
+export const thesisBatchDataSchema = z.object({
+  items: z.array(batchThesisItemSchema),
+  top: batchThesisItemSchema,
+  failures: z.array(z.object({
+    symbol: z.string().min(1),
+    code: z.literal('DATA_SOURCE_UNAVAILABLE'),
+    message: z.string().min(1),
+    recovery: z.object({
+      action: z.literal('retry'),
+      instruction: z.string().min(1),
+    }).strict(),
+  }).strict()),
+  sessionDatasetId: z.string().min(1),
+  disclaimer: z.string().min(1),
 }).strict();
 
 export const compressedChartContextSchema = z.object({

@@ -93,7 +93,7 @@ export function createServer(
     ...contractOptions,
     warnRemoteEgressDisabled,
   });
-  registerThesisBatch(server);         // multi-symbol ranked analysis
+  registerThesisBatch(server, runtime.analyzeBatch, contractOptions); // multi-symbol ranked analysis
   registerAnnotate(
     server,
     runtime.annotateThesis,

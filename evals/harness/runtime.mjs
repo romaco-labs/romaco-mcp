@@ -3,6 +3,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { InMemoryAnalysisRepository } from '../../dist/adapters/outbound/persistence/InMemoryAnalysisRepository.js';
 import { InMemoryDatasetRepository } from '../../dist/adapters/outbound/persistence/InMemoryDatasetRepository.js';
 import { AnnotateThesisUseCase } from '../../dist/application/use-cases/annotateThesis.js';
+import { AnalyzeBatchUseCase } from '../../dist/application/use-cases/analyzeBatch.js';
 import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset.js';
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
@@ -103,6 +104,13 @@ export function createEvalRuntime({ marketData, chart }) {
   );
   const setupChart = new SetupChartUseCase(loadDataset, chart, presets, journal);
   const annotateThesis = new AnnotateThesisUseCase(resolveThesis, datasets, chart, journal);
+  const analyzeBatch = new AnalyzeBatchUseCase(
+    loadDataset,
+    resolveThesis,
+    datasets,
+    analyses,
+    projection,
+  );
   let approvalCounter = 0;
   const approvals = new InMemoryApprovalStore({
     now: () => 1_788_000_000_000,
@@ -120,6 +128,7 @@ export function createEvalRuntime({ marketData, chart }) {
       annotateThesis,
       approvals,
       journal,
+      analyzeBatch,
     },
     projection,
     journal,

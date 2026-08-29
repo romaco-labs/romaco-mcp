@@ -86,6 +86,20 @@ function identityGrader(task, trial) {
       return fail('explicit A resolution drifted or mutated active B identity');
     }
   }
+  if (task.id === 'H09_batch_partial_failure') {
+    const data = structured(trial.facts.batch).data;
+    if (
+      data.items.length !== 2
+      || data.failures.length !== 1
+      || data.failures[0].symbol !== 'MISSING'
+      || data.sessionDatasetId !== data.top.datasetId
+      || trial.facts.activeDatasetId !== data.top.datasetId
+      || trial.facts.activeAnalysisId !== data.top.analysisId
+      || trial.facts.projectedDatasetId !== data.top.datasetId
+    ) {
+      return fail('batch top identity or partial-success correlation drifted');
+    }
+  }
   if (task.id === 'L07_pattern_replace') {
     const replacements = trial.chartCalls.filter((call) => call.operation === 'replaceDrawingGroup');
     const invalid = replacements.find((call) =>
@@ -218,10 +232,34 @@ function financialGrader(task, trial) {
       ? pass('target side and commission-inclusive risk are valid')
       : fail('position-size invariant failed');
   }
+  if (task.id === 'H09_batch_partial_failure') {
+    const items = structured(trial.facts.batch).data.items;
+    const ordered = items.every((item, index) => index === 0 || items[index - 1].score >= item.score);
+    const valid = items.every((item) => {
+      if (!item.setup) return item.score === 0;
+      const directional = item.verdict === 'long'
+        ? item.setup.stop < item.setup.entry && item.setup.target > item.setup.entry
+        : item.setup.stop > item.setup.entry && item.setup.target < item.setup.entry;
+      const rr = Math.abs(item.setup.target - item.setup.entry) / Math.abs(item.setup.entry - item.setup.stop);
+      return directional
+        && Math.abs(rr - item.setup.rr) <= 0.01
+        && Math.abs(item.score - item.setup.rr * item.confidence) <= 1e-8;
+    });
+    return ordered && valid
+      ? pass('batch ranking and setup geometry recompute')
+      : fail('batch ranking or financial geometry is invalid');
+  }
   return pass('no additional financial invariant for task');
 }
 
 function recoveryGrader(_task, trial) {
+  if (_task.id === 'H09_batch_partial_failure') {
+    const failures = structured(trial.facts.batch).data.failures;
+    return failures.length === 1
+      && failures.every((failure) => failure.code && failure.recovery?.instruction)
+      ? pass('partial batch failure is structured and recoverable')
+      : fail('partial batch failure contract missing');
+  }
   const errors = trial.calls.map(structured).filter((value) => value?.status === 'error');
   if (!errors.length) return fail('task expected a recoverable error');
   return errors.every((value) => value.error?.code && value.error?.recovery?.instruction)

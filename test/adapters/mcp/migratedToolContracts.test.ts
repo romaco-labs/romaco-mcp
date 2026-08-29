@@ -204,6 +204,7 @@ describe('hex-migrated MCP output contracts', () => {
       'romaco_load_candles',
       'romaco_setup_chart',
       'romaco_thesis',
+      'romaco_thesis_batch',
       'romaco_detect_patterns',
     ]) {
       expect(tools.tools.find((tool) => tool.name === name)?.outputSchema).toMatchObject({

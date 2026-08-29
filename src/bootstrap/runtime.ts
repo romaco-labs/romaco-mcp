@@ -16,6 +16,7 @@ import { InMemoryApprovalStore } from '../adapters/outbound/security/InMemoryApp
 import type { ChartJournalPort } from '../application/ports/chartJournal.js';
 import { AddDrawingUseCase } from '../application/use-cases/addDrawing.js';
 import { LegacyDrawingTemplateCatalog } from './LegacyDrawingTemplateCatalog.js';
+import { AnalyzeBatchUseCase } from '../application/use-cases/analyzeBatch.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -29,6 +30,7 @@ export interface ApplicationRuntime {
   addDrawing: AddDrawingUseCase;
   approvals: ApprovalPort;
   journal: ChartJournalPort;
+  analyzeBatch: AnalyzeBatchUseCase;
 }
 
 export function createProductionRuntime(): ApplicationRuntime {
@@ -36,11 +38,13 @@ export function createProductionRuntime(): ApplicationRuntime {
   const analyses = new InMemoryAnalysisRepository();
   const chart = new BridgeChartAdapter(bridge);
   const presets = new LegacyPresetCatalog();
+  const marketData = new LegacyMarketDataAdapter();
+  const activeProjection = new LegacySessionProjection();
   const loadDataset = new LoadDatasetUseCase(
-    new LegacyMarketDataAdapter(),
+    marketData,
     datasets,
     analyses,
-    new LegacySessionProjection(),
+    activeProjection,
   );
   const journal = new LegacyChartJournal();
   const drawingTemplates = new LegacyDrawingTemplateCatalog();
@@ -61,6 +65,13 @@ export function createProductionRuntime(): ApplicationRuntime {
     approvals,
     journal,
     addDrawing: new AddDrawingUseCase(chart, drawingTemplates, journal),
+    analyzeBatch: new AnalyzeBatchUseCase(
+      loadDataset,
+      resolveThesis,
+      datasets,
+      analyses,
+      activeProjection,
+    ),
     annotateThesis: new AnnotateThesisUseCase(
       resolveThesis,
       datasets,

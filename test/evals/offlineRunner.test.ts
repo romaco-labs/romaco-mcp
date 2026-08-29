@@ -17,8 +17,8 @@ describe('offline eval harness foundation', () => {
         selectedTasks: 28,
         executed: 0,
         failed: 0,
-        harnessErrors: 17,
-        planned: 11,
+        harnessErrors: 18,
+        planned: 10,
         taskSuccessRate: null,
       },
     });
@@ -29,7 +29,7 @@ describe('offline eval harness foundation', () => {
       trials: SUPPORTED_OFFLINE_TRIALS,
       graders: DETERMINISTIC_GRADERS,
     }).run({ requireAll: true })).rejects.toThrow(
-      /0 runnable eval task\(s\) failed; 0 harness error\(s\); 11 task\(s\) remain planned/,
+      /0 runnable eval task\(s\) failed; 0 harness error\(s\); 10 task\(s\) remain planned/,
     );
   });
 
@@ -41,7 +41,7 @@ describe('offline eval harness foundation', () => {
       graders,
     }).run()).rejects.toMatchObject({
       report: {
-        executed: 17, passed: 0, failed: 17, harnessErrors: 0, planned: 11, taskSuccessRate: 0,
+        executed: 18, passed: 0, failed: 18, harnessErrors: 0, planned: 10, taskSuccessRate: 0,
       },
     });
   });
@@ -53,15 +53,15 @@ describe('offline eval harness foundation', () => {
     }).run();
     expect(report).toMatchObject({
       selectedTasks: 28,
-      executed: 17,
-      passed: 17,
+      executed: 18,
+      passed: 18,
       failed: 0,
-      planned: 11,
+      planned: 10,
       taskSuccessRate: 1,
     });
-    expect(report.results.filter((result) => result.status === 'passed')).toHaveLength(17);
-    expect(report.results.filter((result) => result.status === 'planned')).toHaveLength(11);
-    expect(report.plannedBlockers).toHaveLength(11);
+    expect(report.results.filter((result) => result.status === 'passed')).toHaveLength(18);
+    expect(report.results.filter((result) => result.status === 'planned')).toHaveLength(10);
+    expect(report.plannedBlockers).toHaveLength(10);
     expect(report.plannedBlockers.every((blocker) => blocker.reason.length >= 30)).toBe(true);
   });
 

@@ -93,8 +93,8 @@ async function approvedAnnotate(harness, analysisId) {
   return { challenge, applied, parameters };
 }
 
-async function runWithHarness({ chart, execute }) {
-  const marketData = new FixtureMarketDataPort();
+async function runWithHarness({ chart, execute, marketFixtures = new Map() }) {
+  const marketData = new FixtureMarketDataPort(marketFixtures);
   const built = createEvalRuntime({ marketData, chart });
   const harness = await createEvalMcpHarness({ runtime: built.runtime });
   try {
@@ -218,6 +218,39 @@ async function h08() {
         commissionPerSide: 1,
       });
       return { invalid, corrected, expectedErrorCode: 'INVALID_ARGUMENT' };
+    },
+  });
+}
+
+async function h09() {
+  const aapl = realCandles('AAPL');
+  const spy = realCandles('SPY');
+  const marketFixtures = new Map([
+    ['yfinance:AAPL:1d', {
+      source: 'yfinance', symbol: 'AAPL', timeframe: '1d', candles: aapl, fetchedAt: 1,
+    }],
+    ['yfinance:SPY:1d', {
+      source: 'yfinance', symbol: 'SPY', timeframe: '1d', candles: spy, fetchedAt: 2,
+    }],
+    ['yfinance:MISSING:1d', { error: new Error('fixture market data unavailable') }],
+  ]);
+  return runWithHarness({
+    chart: disconnectedChart(),
+    marketFixtures,
+    execute: async ({ harness, runtime, projection }) => {
+      const batch = await harness.callTool('romaco_thesis_batch', {
+        symbols: ['AAPL', 'SPY', 'MISSING'],
+        timeframe: '1d',
+        lookback: 300,
+      });
+      const activeDataset = await runtime.datasets.getActive();
+      const activeAnalysis = await runtime.analyses.getActive();
+      return {
+        batch,
+        activeDatasetId: activeDataset?.datasetId,
+        activeAnalysisId: activeAnalysis?.analysisId,
+        projectedDatasetId: projection.active?.datasetId,
+      };
     },
   });
 }
@@ -517,6 +550,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['pattern-cost-gate', h04],
   ['flat-stand-aside', h05],
   ['invalid-target-recovery', h08],
+  ['batch-partial-failure', h09],
   ['live-setup-identity', l01],
   ['context-cost-gate', l02],
   ['indicator-id-chain', l03],
