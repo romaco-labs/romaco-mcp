@@ -18,10 +18,10 @@ describe('agent eval manifest', () => {
         approval: 3,
         degraded: 2,
       },
-      runnable: 12,
-      planned: 16,
+      runnable: 14,
+      planned: 14,
       graderCount: 11,
-      fixtureCount: 13,
+      fixtureCount: 14,
     });
     expect(EXPECTED_EVAL_COUNTS.total).toBe(28);
   });
@@ -53,5 +53,17 @@ describe('agent eval manifest', () => {
     const manifest = loadEvalManifest();
     manifest.tasks[0] = { ...manifest.tasks[0], graderRefs: ['claims', 'budget'] };
     expect(() => validateEvalManifest(manifest)).toThrow(/references non-runnable grader: claims/);
+  });
+
+  it('requires precise blockers only on planned tasks', () => {
+    const missing = loadEvalManifest();
+    const plannedIndex = missing.tasks.findIndex((task) => task.status === 'planned');
+    missing.tasks[plannedIndex] = { ...missing.tasks[plannedIndex], plannedReason: '' };
+    expect(() => validateEvalManifest(missing)).toThrow(/needs a precise plannedReason/);
+
+    const runnable = loadEvalManifest();
+    const runnableIndex = runnable.tasks.findIndex((task) => task.status === 'runnable');
+    runnable.tasks[runnableIndex] = { ...runnable.tasks[runnableIndex], plannedReason: 'not allowed here' };
+    expect(() => validateEvalManifest(runnable)).toThrow(/must not declare plannedReason/);
   });
 });

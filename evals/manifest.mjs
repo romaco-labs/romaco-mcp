@@ -104,8 +104,14 @@ export function validateEvalManifest(data = loadEvalManifest()) {
       errors.push(`task ${task.id} has invalid status: ${task.status}`);
     } else if (task.status === 'runnable') {
       runnable += 1;
+      if (task.plannedReason !== undefined) {
+        errors.push(`runnable task ${task.id} must not declare plannedReason`);
+      }
     } else {
       planned += 1;
+      if (typeof task.plannedReason !== 'string' || task.plannedReason.length < 30) {
+        errors.push(`planned task ${task.id} needs a precise plannedReason`);
+      }
     }
 
     if (typeof task.prompt !== 'string' || task.prompt.length < 30) {

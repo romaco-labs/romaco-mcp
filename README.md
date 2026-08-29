@@ -206,10 +206,10 @@ two-step protocol; by itself it cannot cryptographically prove human intent.
 
 ## Evaluation status
 
-`npm run eval:offline` validates 28 declared scenarios and currently executes 12
-deterministic MCP conformance workflows; 16 remain explicitly `planned`. Reported
+`npm run eval:offline` validates 28 declared scenarios and currently executes 14
+deterministic MCP conformance workflows; 14 remain explicitly `planned`. Reported
 success rate uses executed runnable workflows as denominator and always reports
-planned work separately. Runnable failures or missing runnable workflow/grader
+planned work plus concrete blockers separately. Runnable failures or missing runnable workflow/grader
 implementations exit non-zero. Numeric agent-final-answer grading remains planned;
 current `evidence-conformance` checks structured tool evidence, not model prose.
 

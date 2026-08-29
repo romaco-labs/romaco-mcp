@@ -26,7 +26,7 @@ export class OfflineEvalRunner {
         results.push({
           taskId: task.id,
           status: 'planned',
-          reason: 'task-not-runnable',
+          reason: task.plannedReason,
         });
         continue;
       }
@@ -62,6 +62,9 @@ export class OfflineEvalRunner {
       failed: results.filter((result) => result.status === 'failed').length,
       harnessErrors: results.filter((result) => result.status === 'harness_error').length,
       planned: results.filter((result) => result.status === 'planned').length,
+      plannedBlockers: results
+        .filter((result) => result.status === 'planned')
+        .map((result) => ({ taskId: result.taskId, reason: result.reason })),
       results,
     };
     report.taskSuccessRate = report.executed > 0 ? report.passed / report.executed : null;
