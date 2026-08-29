@@ -56,9 +56,12 @@ describe('gated tools — default (no ack) output stays under budget', () => {
   });
 
   it('romaco_get_indicator_values: successful default payload stays <2KB', async () => {
+    vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('default');
+    vi.spyOn(bridge, 'getContext').mockResolvedValue({ symbol: 'AAPL', resolution: '1d' });
     vi.spyOn(bridge, 'executeAction').mockResolvedValue({
       success: true,
       data: {
+        id: 'rsi-14',
         name: 'RSI',
         params: [14],
         series: [{ key: 'value', values: Array.from({ length: 1_000 }, (_, i) => i % 100) }],

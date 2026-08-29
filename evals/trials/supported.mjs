@@ -255,6 +255,22 @@ async function l02() {
   });
 }
 
+async function l03() {
+  const candles = realCandles('AAPL').slice(-120);
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness }) => {
+      const added = await harness.callTool('romaco_add_indicator', {
+        indicatorType: 'RSI',
+        params: [14],
+      });
+      const indicatorId = structured(added).data.indicator.indicatorId;
+      const values = await harness.callTool('romaco_get_indicator_values', { indicatorId });
+      return { added, values, indicatorId };
+    },
+  });
+}
+
 async function l05() {
   const candles = realCandles('AAPL');
   const userDrawing = { id: 'user_1', owner: 'user', groupId: null, type: 'trendline' };
@@ -503,6 +519,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['invalid-target-recovery', h08],
   ['live-setup-identity', l01],
   ['context-cost-gate', l02],
+  ['indicator-id-chain', l03],
   ['annotate-atomic-idempotent', l05],
   ['group-preserves-user-state', s04],
   ['cross-symbol-hard-stop', l06],

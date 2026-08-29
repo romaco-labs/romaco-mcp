@@ -119,6 +119,7 @@ export function createEvalRuntime({ marketData, chart }) {
       resolveThesis,
       annotateThesis,
       approvals,
+      journal,
     },
     projection,
     journal,

@@ -6,6 +6,8 @@ import { registerAnnotate } from '../../../src/adapters/inbound/mcp/tools/annota
 import { registerGetChartContext } from '../../../src/adapters/inbound/mcp/tools/getChartContext.js';
 import { registerListPanes } from '../../../src/adapters/inbound/mcp/tools/listPanes.js';
 import { registerCaptureSnapshot } from '../../../src/adapters/inbound/mcp/tools/captureSnapshot.js';
+import { registerAddIndicator } from '../../../src/adapters/inbound/mcp/tools/addIndicator.js';
+import { registerGetIndicatorValues } from '../../../src/adapters/inbound/mcp/tools/getIndicatorValues.js';
 import type { AnnotateThesisUseCase } from '../../../src/application/use-cases/annotateThesis.js';
 import type { ChartPort } from '../../../src/application/ports/chart.js';
 import { createAnalysisId } from '../../../src/domain/analysis/model.js';
@@ -36,9 +38,21 @@ function chart(): ChartPort {
         panels: [],
       },
     }),
-    execute: async (command) => command.action === 'listPanes'
-      ? { success: true, data: { panes: [{ id: 'main', alias: 'main', indicators: [] }] } }
-      : { success: true },
+    execute: async (command) => {
+      if (command.action === 'listPanes') {
+        return { success: true, data: { panes: [{ id: 'main', alias: 'main', indicators: [] }] } };
+      }
+      if (command.action === 'addIndicator') {
+        return { success: true, data: { indicatorId: 'rsi-14' }, resourceIds: ['rsi-14'] };
+      }
+      if (command.action === 'getIndicatorValues') {
+        return {
+          success: true,
+          data: { id: 'rsi-14', name: 'RSI', params: [14], series: [{ key: 'value', values: [45, 55] }] },
+        };
+      }
+      return { success: true };
+    },
     replaceDrawingGroup: async () => ({ success: true }),
     captureSnapshot: async (format) => ({ format, dataUrl: 'data:image/png;base64,ZmFrZQ==' }),
   };
@@ -73,6 +87,11 @@ describe('live hex MCP output contracts', () => {
     registerGetChartContext(server, chartPort);
     registerListPanes(server, chartPort);
     registerCaptureSnapshot(server, chartPort);
+    registerAddIndicator(server, chartPort, {
+      recordIndicator: () => {},
+      replaceDrawingGroup: () => {},
+    });
+    registerGetIndicatorValues(server, chartPort);
     registerAnnotate(server, {
       execute: async () => ({
         artifact,
@@ -166,6 +185,32 @@ describe('live hex MCP output contracts', () => {
     expect(JSON.stringify(result.structuredContent)).not.toContain('ZmFrZQ==');
   });
 
+  it('chains indicator reads through exact host indicatorId', async () => {
+    const added = await client.callTool({
+      name: 'romaco_add_indicator',
+      arguments: { indicatorType: 'RSI', params: [14] },
+    });
+    expect(added.structuredContent).toMatchObject({
+      status: 'ok',
+      data: {
+        indicator: { indicatorId: 'rsi-14', type: 'RSI', params: [14] },
+        applied: true,
+      },
+    });
+    const values = await client.callTool({
+      name: 'romaco_get_indicator_values',
+      arguments: { indicatorId: 'rsi-14' },
+    });
+    expect(values.structuredContent).toMatchObject({
+      status: 'ok',
+      data: {
+        format: 'concise',
+        indicatorId: 'rsi-14',
+        values: { id: 'rsi-14', name: 'RSI', lastValues: { value: 55 } },
+      },
+    });
+  });
+
   it('returns analysis/chart/resource identities for an atomic annotation', async () => {
     const challenge = await client.callTool({
       name: 'romaco_annotate',
@@ -211,6 +256,8 @@ describe('live hex MCP output contracts', () => {
       'romaco_get_chart_context',
       'romaco_list_panes',
       'romaco_capture_snapshot',
+      'romaco_add_indicator',
+      'romaco_get_indicator_values',
       'romaco_annotate',
     ]) {
       expect(tools.tools.find((tool) => tool.name === name)?.outputSchema).toMatchObject({

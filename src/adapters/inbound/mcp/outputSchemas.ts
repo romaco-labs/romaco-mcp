@@ -251,6 +251,21 @@ export const snapshotDataSchema = z.object({
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
 }).strict();
 
+export const addIndicatorDataSchema = z.object({
+  indicator: z.object({
+    indicatorId: z.string().min(1),
+    type: z.string().min(1),
+    params: z.array(z.number()),
+  }).strict(),
+  applied: z.literal(true),
+}).strict();
+
+export const indicatorValuesDataSchema = z.object({
+  format: z.enum(['concise', 'full']),
+  indicatorId: z.string().min(1),
+  values: z.record(z.unknown()),
+}).strict();
+
 export const annotateDataSchema = z.object({
   analysisId: z.string().min(1),
   datasetId: z.string().min(1),

@@ -81,7 +81,7 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.add-indicator.v1',
       summary: 'Applied indicator and host-assigned identity.',
-      dataFields: ['indicator', 'applied', 'idempotencyKey'],
+      dataFields: ['indicator', 'applied'],
       identityFields: ['chartId', 'datasetId'],
       contentKinds: TEXT,
     },

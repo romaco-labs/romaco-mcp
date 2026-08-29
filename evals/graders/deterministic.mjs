@@ -111,6 +111,24 @@ function terminalStateGrader(task, trial) {
       return fail('matched preset did not create exactly two indicators');
     }
   }
+  if (task.id === 'L03_indicator_id_chain') {
+    const added = structured(trial.facts.added).data.indicator;
+    const values = structured(trial.facts.values).data;
+    const read = trial.chartCalls.find(
+      (call) => call.operation === 'execute' && call.command.action === 'getIndicatorValues',
+    );
+    const journal = trial.journal.indicators;
+    if (
+      trial.chartState.indicators.length !== 1
+      || trial.chartState.indicators[0].id !== added.indicatorId
+      || values.indicatorId !== added.indicatorId
+      || read?.command.indicatorId !== added.indicatorId
+      || journal.length !== 1
+      || journal[0].resourceId !== added.indicatorId
+    ) {
+      return fail('indicator add/read chain drifted from returned host ID');
+    }
+  }
   if (task.id === 'L05_annotate_atomic' || task.id === 'S04_group_preserves_user_state') {
     const retry = structured(trial.facts.retry).data;
     const owned = trial.chartState.drawings.filter((drawing) => drawing.groupId === retry.groupId);

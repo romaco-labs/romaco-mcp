@@ -128,8 +128,8 @@ export class FakeChartPort {
     switch (command.action) {
       case 'addIndicator': {
         const id = this.nextId('indicator');
-        this.indicators.push({ id, type: command.indicatorType, params: command.params ?? [] });
-        return { success: true, data: { id }, resourceIds: [id] };
+        this.indicators.push({ id, name: command.indicatorType, type: command.indicatorType, params: command.params ?? [] });
+        return { success: true, data: { indicatorId: id }, resourceIds: [id] };
       }
       case 'removeIndicator': {
         const before = this.indicators.length;
@@ -177,8 +177,23 @@ export class FakeChartPort {
           success: true,
           data: { panes: [{ id: 'main', alias: 'main', indicators: copy(this.indicators) }] },
         };
-      case 'getIndicatorValues':
-        return { success: true, data: { indicatorId: command.indicatorId, series: [] } };
+      case 'getIndicatorValues': {
+        const indicator = this.indicators.find((item) =>
+          command.indicatorId
+            ? item.id === command.indicatorId
+            : item.name?.toLowerCase() === command.indicatorName?.toLowerCase(),
+        );
+        if (!indicator) throw new Error('Indicator not found');
+        return {
+          success: true,
+          data: {
+            id: indicator.id,
+            name: indicator.name,
+            params: copy(indicator.params),
+            series: [{ key: 'value', values: [45, 55] }],
+          },
+        };
+      }
       default:
         return { success: true, data: {} };
     }

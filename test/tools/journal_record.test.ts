@@ -11,7 +11,10 @@ const AAPL_DAILY = {
 // The mutating tools call the global `bridge` singleton. Stub it to "succeed"
 // without a real browser so we can assert the journal side-effect.
 beforeEach(() => {
-  vi.spyOn(bridge, 'executeAction').mockResolvedValue({ success: true });
+  vi.spyOn(bridge, 'executeAction').mockResolvedValue({
+    success: true,
+    data: { indicatorId: 'indicator-default' },
+  });
   vi.spyOn(bridge, 'chartId', 'get').mockReturnValue('primary');
   vi.spyOn(bridge, 'getContext').mockResolvedValue({ symbol: 'AAPL', resolution: '1d' });
 });

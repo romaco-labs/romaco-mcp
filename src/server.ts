@@ -62,7 +62,7 @@ export function createServer(
   // Browser-bridge tools (require <McpBridge /> in user's app)
   registerGetChartContext(server, runtime.chart, contractOptions);
   registerGetVisibleCandles(server);
-  registerAddIndicator(server);
+  registerAddIndicator(server, runtime.chart, runtime.journal, contractOptions);
   registerAddDrawing(server);
   registerSetZoom(server);       // also registers romaco_reset_view
   registerAddAlert(server);
@@ -75,7 +75,7 @@ export function createServer(
 
   // Living Annotations — Phase 0 unlock
   registerListPanes(server, runtime.chart, contractOptions);
-  registerGetIndicatorValues(server);
+  registerGetIndicatorValues(server, runtime.chart, contractOptions);
   registerGoToTimestamp(server);
 
   // Headless data + analysis tools (no browser required)

@@ -13,6 +13,7 @@ import { LegacySessionDatasetSource } from './LegacySessionDatasetSource.js';
 import { AnnotateThesisUseCase } from '../application/use-cases/annotateThesis.js';
 import type { ApprovalPort } from '../application/ports/approval.js';
 import { InMemoryApprovalStore } from '../adapters/outbound/security/InMemoryApprovalStore.js';
+import type { ChartJournalPort } from '../application/ports/chartJournal.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -24,6 +25,7 @@ export interface ApplicationRuntime {
   resolveThesis: ResolveThesisArtifactUseCase;
   annotateThesis: AnnotateThesisUseCase;
   approvals: ApprovalPort;
+  journal: ChartJournalPort;
 }
 
 export function createProductionRuntime(): ApplicationRuntime {
@@ -53,6 +55,7 @@ export function createProductionRuntime(): ApplicationRuntime {
     presetNames: presets.names(),
     resolveThesis,
     approvals,
+    journal,
     annotateThesis: new AnnotateThesisUseCase(
       resolveThesis,
       datasets,
