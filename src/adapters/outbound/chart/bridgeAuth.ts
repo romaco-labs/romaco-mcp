@@ -6,7 +6,8 @@ const NONCE_BYTES = 32;
 const CONTEXT = 'romaco-mcp-bridge-auth-v2';
 
 function decodeCanonicalBase64Url(value: string, expectedBytes: number): Buffer | null {
-  if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
+  const expectedLength = Math.ceil((expectedBytes * 8) / 6);
+  if (value.length !== expectedLength || !/^[A-Za-z0-9_-]+$/.test(value)) return null;
   try {
     const decoded = Buffer.from(value, 'base64url');
     if (decoded.byteLength !== expectedBytes || decoded.toString('base64url') !== value) return null;

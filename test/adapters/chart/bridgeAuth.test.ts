@@ -33,11 +33,15 @@ describe('bridge auth v2', () => {
   });
 
   it('requires canonical 32-byte base64url tokens and nonces', () => {
+    const nonCanonicalTokenAlias = `${TOKEN.slice(0, -1)}_`;
+    const nonCanonicalNonceAlias = `${CLIENT_NONCE.slice(0, -1)}_`;
     expect(parsePairingToken(TOKEN)).toHaveLength(32);
     expect(parsePairingToken(`${TOKEN}=`)).toBeNull();
+    expect(parsePairingToken(nonCanonicalTokenAlias)).toBeNull();
     expect(parsePairingToken('short')).toBeNull();
     expect(isCanonicalNonce(createNonce())).toBe(true);
     expect(isCanonicalNonce(`${CLIENT_NONCE}=`)).toBe(false);
+    expect(isCanonicalNonce(nonCanonicalNonceAlias)).toBe(false);
   });
 
   it('rejects nonce replay until TTL expires', () => {
