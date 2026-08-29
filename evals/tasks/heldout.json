@@ -63,7 +63,7 @@
     "id": "S05_explicit_dataset_race",
     "split": "heldout",
     "category": "state-recovery",
-    "status": "planned",
+    "status": "runnable",
     "prompt": "Load AAPL, then TSLA, then explicitly analyze the earlier AAPL dataset by ID without relying on last-loaded state.",
     "oracleWorkflow": "explicit-dataset-race",
     "fixtureRefs": ["real-aapl", "real-tsla"],

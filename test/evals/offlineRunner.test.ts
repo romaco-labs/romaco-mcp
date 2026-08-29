@@ -35,14 +35,14 @@ describe('offline eval harness foundation', () => {
     }).run();
     expect(report).toMatchObject({
       selectedTasks: 28,
-      executed: 9,
-      passed: 9,
+      executed: 11,
+      passed: 11,
       failed: 0,
-      planned: 19,
+      planned: 17,
       taskSuccessRate: 1,
     });
-    expect(report.results.filter((result) => result.status === 'passed')).toHaveLength(9);
-    expect(report.results.filter((result) => result.status === 'planned')).toHaveLength(19);
+    expect(report.results.filter((result) => result.status === 'passed')).toHaveLength(11);
+    expect(report.results.filter((result) => result.status === 'planned')).toHaveLength(17);
   });
 
   it('provides deterministic fakes matching current outbound port shapes', async () => {

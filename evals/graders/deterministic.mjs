@@ -71,6 +71,19 @@ function identityGrader(task, trial) {
     const error = structured(trial.facts.annotate).error;
     if (error.code !== 'CHART_CONTEXT_MISMATCH') return fail('cross-symbol error code drift');
   }
+  if (task.id === 'S05_explicit_dataset_race') {
+    const facts = trial.facts;
+    if (
+      facts.explicitA.analysisId !== facts.a.analysisId
+      || facts.explicitA.datasetId !== facts.a.datasetId
+      || facts.activeBefore.analysisId !== facts.b.analysisId
+      || facts.activeBefore.datasetId !== facts.b.datasetId
+      || facts.activeAfter.analysisId !== facts.b.analysisId
+      || facts.activeAfter.datasetId !== facts.b.datasetId
+    ) {
+      return fail('explicit A resolution drifted or mutated active B identity');
+    }
+  }
   return pass('identity references remain correlated');
 }
 
@@ -84,12 +97,30 @@ function terminalStateGrader(task, trial) {
       return fail('matched preset did not create exactly two indicators');
     }
   }
-  if (task.id === 'L05_annotate_atomic') {
+  if (task.id === 'L05_annotate_atomic' || task.id === 'S04_group_preserves_user_state') {
     const retry = structured(trial.facts.retry).data;
     const owned = trial.chartState.drawings.filter((drawing) => drawing.groupId === retry.groupId);
     const user = trial.chartState.drawings.find((drawing) => drawing.id === trial.facts.userDrawingId);
-    if (!user || owned.length !== retry.drawingCount) {
+    const journal = trial.journal.groups[retry.groupId];
+    if (
+      !user
+      || owned.length !== retry.drawingCount
+      || journal?.drawings?.length !== retry.drawingCount
+      || journal?.identity?.symbol !== 'AAPL'
+      || journal?.identity?.timeframe !== '1d'
+      || journal?.idempotencyKey !== retry.idempotencyKey
+      || JSON.stringify(journal?.resourceIds) !== JSON.stringify(retry.drawingIds)
+    ) {
       return fail('atomic retry duplicated group or removed user drawing');
+    }
+  }
+  if (task.id === 'S05_explicit_dataset_race') {
+    const facts = trial.facts;
+    if (
+      facts.activeBefore.analysisId !== facts.activeAfter.analysisId
+      || facts.activeBefore.datasetId !== facts.activeAfter.datasetId
+    ) {
+      return fail('explicit artifact lookup mutated active B state');
     }
   }
   return pass('terminal fake-port state matches outcome');
@@ -131,7 +162,7 @@ function safetyGrader(task, trial) {
       ? pass('stand-aside workflow performs zero writes')
       : fail('stand-aside workflow wrote drawings');
   }
-  if (task.id === 'L05_annotate_atomic') {
+  if (task.id === 'L05_annotate_atomic' || task.id === 'S04_group_preserves_user_state') {
     return trial.chartState.drawings.some((drawing) => drawing.id === trial.facts.userDrawingId)
       ? pass('user drawing survives owned-group replacement')
       : fail('user drawing was removed');

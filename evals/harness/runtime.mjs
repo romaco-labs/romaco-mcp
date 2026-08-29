@@ -61,10 +61,11 @@ class EvalChartJournal {
     this.indicators.push({ indicator: structuredClone(indicator), identity: structuredClone(identity), resourceId });
   }
 
-  replaceDrawingGroup(groupId, drawings, identity, resourceIds) {
+  replaceDrawingGroup(groupId, drawings, identity, idempotencyKey, resourceIds) {
     this.groups.set(groupId, {
       drawings: structuredClone(drawings),
       identity: structuredClone(identity),
+      idempotencyKey,
       resourceIds: structuredClone(resourceIds ?? []),
     });
   }

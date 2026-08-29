@@ -195,7 +195,7 @@
     "id": "S04_group_preserves_user_state",
     "split": "dev",
     "category": "state-recovery",
-    "status": "planned",
+    "status": "runnable",
     "prompt": "Replace only Romaco's thesis annotation group and prove that an existing user trendline remains untouched.",
     "oracleWorkflow": "group-preserves-user-state",
     "fixtureRefs": ["real-aapl", "chart-user-drawings", "approval-state"],

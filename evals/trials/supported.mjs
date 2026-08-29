@@ -241,6 +241,53 @@ async function l06() {
   });
 }
 
+async function s05() {
+  const aapl = realCandles('AAPL');
+  const tsla = realCandles('TSLA');
+  return runWithHarness({
+    chart: disconnectedChart(),
+    execute: async ({ harness, runtime }) => {
+      const setupA = await harness.callTool('romaco_setup_chart', {
+        symbol: 'AAPL', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: aapl,
+      });
+      const a = structured(setupA).data;
+      const setupB = await harness.callTool('romaco_setup_chart', {
+        symbol: 'TSLA', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: tsla,
+      });
+      const b = structured(setupB).data;
+      const activeDatasetBefore = await runtime.datasets.getActive();
+      const activeAnalysisBefore = await runtime.analyses.getActive();
+
+      // Exercise real correlation-safe use case, not a fake projection. Explicit
+      // artifact resolution must neither depend on nor mutate active B state.
+      const explicitA = await runtime.resolveThesis.resolve(a.analysisId);
+
+      const activeDatasetAfter = await runtime.datasets.getActive();
+      const activeAnalysisAfter = await runtime.analyses.getActive();
+      return {
+        setupA,
+        setupB,
+        explicitA: {
+          analysisId: explicitA.analysisId,
+          datasetId: explicitA.datasetId,
+          lastPrice: explicitA.summary.meta.last_price,
+        },
+        a: { analysisId: a.analysisId, datasetId: a.dataset.datasetId },
+        b: { analysisId: b.analysisId, datasetId: b.dataset.datasetId },
+        activeBefore: {
+          analysisId: activeAnalysisBefore?.analysisId,
+          datasetId: activeDatasetBefore?.datasetId,
+        },
+        activeAfter: {
+          analysisId: activeAnalysisAfter?.analysisId,
+          datasetId: activeDatasetAfter?.datasetId,
+        },
+        claims: [explicitA.summary.meta.last_price],
+      };
+    },
+  });
+}
+
 export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['raw-load-analyze', h01],
   ['headless-setup', h02],
@@ -250,5 +297,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['live-setup-identity', l01],
   ['context-cost-gate', l02],
   ['annotate-atomic-idempotent', l05],
+  ['group-preserves-user-state', l05],
   ['cross-symbol-hard-stop', l06],
+  ['explicit-dataset-race', s05],
 ]);

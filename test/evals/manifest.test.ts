@@ -18,8 +18,8 @@ describe('agent eval manifest', () => {
         approval: 3,
         degraded: 2,
       },
-      runnable: 9,
-      planned: 19,
+      runnable: 11,
+      planned: 17,
       graderCount: 10,
       fixtureCount: 13,
     });
