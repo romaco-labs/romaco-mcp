@@ -79,6 +79,15 @@ MCP denies automatic retry until manual chart reconciliation and fresh-key
 approval. It cannot guarantee crash-safe exactly-once semantics. No claim of
 durable trade execution exists.
 
+## Approved alert clear
+
+`romaco_clear_alerts` previews stable alert IDs for exact `chartId + symbol +
+timeframe`, then issues a one-time approval scoped to that immutable plan. After
+approval, MCP sends one `removeAlert` action per approved ID with
+`expectedIdentity`. It never sends global `clearAlerts`. Chart or alert-plan
+drift fails before writes; partial apply reports successful and failed IDs and
+requires fresh preview/approval for remaining alerts.
+
 ## Compatibility behavior
 
 | Capability | Host requirement | Older host behavior |

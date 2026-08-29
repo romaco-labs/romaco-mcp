@@ -118,12 +118,15 @@ export function Terminal() {
 
 With the bridge connected, the chart-bridge tools become live. If the bridge is not mounted, those tools simply have nothing to talk to — the headless tools keep working regardless.
 
-Three high-impact tools are intentionally two-step:
+Four high-impact tools are intentionally two-step:
 
 - `romaco_annotate`: approval scope is exact `analysisId`.
 - `romaco_clear_drawings`: first call previews exact chart identity and current
   `romaco-mcp/*` groups. Retry with returned `planId` and `approvalToken`. Tool
   never sends global `clearDrawings`, so user-owned drawings remain untouched.
+- `romaco_clear_alerts`: first call previews exact chart identity and stable
+  alert IDs. Retry with returned `planId` and `approvalToken`. Tool removes each
+  approved ID separately and never sends global `clearAlerts`.
 - `romaco_open_paper_position`: caller must provide `idempotencyKey`. Approval
   scope includes exact chart identity, side, quantity, SL, TP, and key. Tool is
   visual paper simulation only; it cannot place real orders.

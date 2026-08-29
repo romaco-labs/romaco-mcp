@@ -22,6 +22,7 @@ import { ClearAgentDrawingsUseCase } from '../application/use-cases/clearAgentDr
 import { OpenPaperPositionUseCase } from '../application/use-cases/openPaperPosition.js';
 import { InMemoryPaperPositionIdempotencyStore } from '../adapters/outbound/persistence/InMemoryPaperPositionIdempotencyStore.js';
 import { ReconcileChartStateUseCase } from '../application/use-cases/reconcileChartState.js';
+import { ClearAlertsUseCase } from '../application/use-cases/clearAlerts.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -37,6 +38,7 @@ export interface ApplicationRuntime {
   journal: ChartDesiredStatePort;
   analyzeBatch: AnalyzeBatchUseCase;
   clearAgentDrawings: ClearAgentDrawingsUseCase;
+  clearAlerts: ClearAlertsUseCase;
   openPaperPosition: OpenPaperPositionUseCase;
   reconcileChart: ReconcileChartStateUseCase;
 }
@@ -83,6 +85,7 @@ export function createProductionRuntime(): ApplicationRuntime {
       activeProjection,
     ),
     clearAgentDrawings: new ClearAgentDrawingsUseCase(chart, agentDrawingJournal),
+    clearAlerts: new ClearAlertsUseCase(chart, journal),
     openPaperPosition: new OpenPaperPositionUseCase(chart, paperPositionIdempotency),
     reconcileChart: new ReconcileChartStateUseCase(chart, journal),
     annotateThesis: new AnnotateThesisUseCase(

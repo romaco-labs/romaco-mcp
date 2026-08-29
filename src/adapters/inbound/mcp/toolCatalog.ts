@@ -166,9 +166,9 @@ export const ROMACO_TOOL_CATALOG = [
     risk: { level: 'medium', financial: true, approval: 'confirmation-token' },
     output: {
       schemaId: 'romaco.clear-alerts.v1',
-      summary: 'Count of alerts removed from one chart.',
-      dataFields: ['removedCount'],
-      identityFields: ['chartId'],
+      summary: 'Approved exact-alert removal result for one chart identity.',
+      dataFields: ['planId', 'alertIds', 'removedCount', 'scope'],
+      identityFields: ['chartId', 'symbol', 'timeframe'],
       contentKinds: TEXT,
       supportsNoop: true,
     },

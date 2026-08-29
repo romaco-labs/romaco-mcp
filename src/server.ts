@@ -7,7 +7,7 @@ import { registerAddDrawing } from './adapters/inbound/mcp/tools/addDrawing.js';
 import { registerSetZoom } from './tools/set_zoom.js';
 import { registerAddAlert } from './tools/add_alert.js';
 import { registerRemoveAlert } from './tools/remove_alert.js';
-import { registerClearAlerts } from './tools/clear_alerts.js';
+import { registerClearAlerts } from './adapters/inbound/mcp/tools/clearAlerts.js';
 import { registerRemoveIndicator } from './tools/remove_indicator.js';
 import { registerCaptureSnapshot } from './tools/capture_snapshot.js';
 import { registerOpenPaperPosition } from './adapters/inbound/mcp/tools/openPaperPosition.js';
@@ -67,7 +67,7 @@ export function createServer(
   registerSetZoom(server);       // also registers romaco_reset_view
   registerAddAlert(server, runtime.chart, runtime.journal);
   registerRemoveAlert(server, runtime.chart, runtime.journal);
-  registerClearAlerts(server);
+  registerClearAlerts(server, runtime.clearAlerts, runtime.approvals, contractOptions);
   registerRemoveIndicator(server, runtime.chart, runtime.journal);
   registerCaptureSnapshot(server, runtime.chart, contractOptions);
   registerOpenPaperPosition(

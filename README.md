@@ -102,6 +102,7 @@ Exposes 20+ MCP tools in two categories:
 - `romaco_add_indicator` — EMA, RSI, MACD, Bollinger, ATR, 29+ indicators
 - `romaco_add_drawing` — trendlines, Fibonacci, horizontal lines, channels, rectangles
 - `romaco_add_alert` — price alerts with direction (above/below/cross)
+- `romaco_clear_alerts` — preview, approve, then remove exact alert IDs from one chart; never sends global clear
 - `romaco_capture_snapshot` — PNG/JPEG base64 for vision LLMs
 - `romaco_open_paper_position` — approval-gated simulated long/short with SL/TP and deterministic process-local idempotency
 - `romaco_get_chart_context` — concise live chart state; raw chart export is disabled
@@ -198,7 +199,7 @@ Add EMA 20 and RSI 14 to the chart, draw a Fibonacci from the last swing low to 
 and capture a snapshot so I can see it.
 ```
 
-`romaco_annotate`, `romaco_clear_drawings`, and
+`romaco_annotate`, `romaco_clear_drawings`, `romaco_clear_alerts`, and
 `romaco_open_paper_position` use two-step confirmation. First call returns a
 scoped token and performs zero chart writes. MCP rejects missing, expired,
 wrong-scope, and replayed tokens. Agent/client must send token only after
@@ -209,6 +210,10 @@ cannot cryptographically prove human intent and never bypasses chart host's
 Drawing clear scope binds exact chart identity plus current Romaco-managed group
 plan. It never sends global `clearDrawings`; each reserved `romaco-mcp/*` group
 is replaced with empty desired state, leaving user and unrelated groups intact.
+
+Alert clear scope binds exact chart identity plus current stable alert IDs. It
+never sends global `clearAlerts`; each approved alert is removed by ID with host
+identity policy. Alert-plan drift consumes the token and performs zero writes.
 
 Paper positions are visual simulation only: no broker, real order, or money.
 Caller supplies stable `idempotencyKey`. Same completed key/payload returns same

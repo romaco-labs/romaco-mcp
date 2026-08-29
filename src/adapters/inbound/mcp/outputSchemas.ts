@@ -340,6 +340,16 @@ export const clearDrawingsDataSchema = z.object({
   scope: z.literal('romaco-agent-groups'),
 }).strict();
 
+export const clearAlertsDataSchema = z.object({
+  planId: z.string().min(1),
+  chartId: z.string().min(1),
+  symbol: z.string().min(1),
+  timeframe: timeframeSchema,
+  alertIds: z.array(z.string().min(1)),
+  removedCount: z.number().int().nonnegative(),
+  scope: z.literal('current-chart-alerts'),
+}).strict();
+
 export const openPaperPositionDataSchema = z.object({
   chartId: z.string().min(1),
   symbol: z.string().min(1),
