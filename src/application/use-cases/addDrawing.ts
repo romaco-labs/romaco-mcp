@@ -5,6 +5,8 @@ import type { DrawingTemplateCatalogPort } from '../ports/drawingTemplateCatalog
 import type { ChartCommand, ChartIdentity } from '../../domain/chart/model.js';
 
 type AddDrawingCommand = Extract<ChartCommand, { action: 'addDrawing' }>;
+const AGENT_GROUP_PREFIX = 'romaco-mcp/';
+const MAX_GROUP_ID_LENGTH = 256;
 
 export interface AddDrawingInput extends Omit<AddDrawingCommand, 'action' | 'drawingType'> {
   drawingType: string;
@@ -81,6 +83,24 @@ export class AddDrawingUseCase {
     }
     // Validate all host-owned template invariants before reading identity or writing.
     validatePoints(template.name, input.points, template.pointCount);
+    const groupId = input.groupId?.trim();
+    if (groupId !== undefined && (
+      !groupId.startsWith(AGENT_GROUP_PREFIX)
+      || groupId.length === AGENT_GROUP_PREFIX.length
+      || groupId.length > MAX_GROUP_ID_LENGTH
+    )) {
+      throw new ApplicationError(
+        'INVALID_ARGUMENT',
+        `Agent drawing groupId must use ${AGENT_GROUP_PREFIX}<name> and contain at most ${MAX_GROUP_ID_LENGTH} characters.`,
+        {
+          recovery: {
+            action: 'change_input',
+            instruction: `Omit groupId or use the reserved ${AGENT_GROUP_PREFIX}<name> namespace.`,
+          },
+          details: { groupId: input.groupId ?? '' },
+        },
+      );
+    }
 
     const identity = await this.chart.getIdentity();
     if (!identity.symbol || !identity.timeframe) {
@@ -96,7 +116,7 @@ export class AddDrawingUseCase {
       ...(input.label !== undefined ? { label: input.label } : {}),
       ...(input.style !== undefined ? { style: input.style } : {}),
       ...(input.paneId !== undefined ? { paneId: input.paneId } : {}),
-      ...(input.groupId !== undefined ? { groupId: input.groupId } : {}),
+      ...(groupId !== undefined ? { groupId } : {}),
     };
     const result = await this.chart.execute(drawing, { expectedIdentity: identity });
     if (!result.success) {

@@ -104,6 +104,28 @@ describe('romaco_add_drawing structured contract', () => {
     expect(recordDrawing).not.toHaveBeenCalled();
   });
 
+  it('rejects a user-owned group namespace with typed recovery and zero writes', async () => {
+    const result = await client.callTool({
+      name: 'romaco_add_drawing',
+      arguments: {
+        drawingType: 'fibRetracement',
+        points: [{ timestamp: 1, price: 100 }, { timestamp: 2, price: 120 }],
+        groupId: 'user/portfolio-notes',
+      },
+    });
+
+    expect(result.structuredContent).toMatchObject({
+      status: 'error',
+      error: {
+        code: 'INVALID_ARGUMENT',
+        recovery: { action: 'change_input' },
+      },
+    });
+    expect(chart.getIdentity).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(recordDrawing).not.toHaveBeenCalled();
+  });
+
   it('advertises strict output schema and reports legacy host missing drawingId honestly', async () => {
     execute.mockResolvedValueOnce({ success: true });
     const tools = await client.listTools();

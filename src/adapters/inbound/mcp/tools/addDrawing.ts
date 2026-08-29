@@ -63,7 +63,9 @@ export function registerAddDrawing(
           fillColor: z.string().optional(),
         }).strict().optional(),
         paneId: z.string().optional().describe('Main or indicator pane id from romaco_list_panes.'),
-        groupId: z.string().optional().describe('Optional Romaco-owned drawing group id.'),
+        groupId: z.string().optional().describe(
+          'Optional agent-owned group id in reserved romaco-mcp/<name> namespace. Other namespaces are rejected.',
+        ),
       }),
       dataSchema: addDrawingDataSchema,
     },
