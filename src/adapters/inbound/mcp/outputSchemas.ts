@@ -350,7 +350,7 @@ export const openPaperPositionDataSchema = z.object({
     quantity: z.number().positive(),
     stopLoss: z.number().positive().optional(),
     takeProfit: z.number().positive().optional(),
-    hostPositionId: z.string().min(1).optional(),
+    hostPositionId: z.string().min(1).max(256).optional(),
   }).strict(),
   idempotencyKey: z.string().min(1),
   replayed: z.boolean(),

@@ -41,6 +41,6 @@ export class LegacyAgentDrawingJournal implements AgentDrawingJournalPort {
       throw new Error(`Refusing to remove non-agent drawing group ${groupId}.`);
     }
     const existing = this.listAgentDrawingGroups(identity).some((group) => group.groupId === groupId);
-    if (existing) chartState.removeDrawingsByGroup(groupId);
+    if (existing) chartState.removeDrawingsByGroupForIdentity(groupId, identity);
   }
 }

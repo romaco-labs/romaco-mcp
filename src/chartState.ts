@@ -40,6 +40,13 @@ function indicatorKey(a: Extract<BridgeAction, { action: 'addIndicator' }>): str
   return `${a.indicatorType.toLowerCase()}:${(a.params ?? []).join(',')}`;
 }
 
+function hasIdentity(entry: JournalEntry, identity: ChartIdentity): boolean {
+  return entry.identity?.chartId === identity.chartId
+    && entry.identity.symbol === identity.symbol
+    && entry.identity.timeframe === identity.timeframe
+    && entry.identity.datasetId === identity.datasetId;
+}
+
 class ChartStateJournal {
   private indicators: JournalEntry[] = [];
   private drawings: JournalEntry[] = [];
@@ -122,6 +129,18 @@ class ChartStateJournal {
     this.drawingGroups = this.drawingGroups.filter(
       (entry) => (entry.action as Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>).groupId !== groupId,
     );
+  }
+
+  /** Drop one group's desired state only for exact chart identity. */
+  removeDrawingsByGroupForIdentity(groupId: string, identity: ChartIdentity): void {
+    this.drawings = this.drawings.filter((entry) => {
+      const action = entry.action as Extract<BridgeAction, { action: 'addDrawing' }>;
+      return action.groupId !== groupId || !hasIdentity(entry, identity);
+    });
+    this.drawingGroups = this.drawingGroups.filter((entry) => {
+      const action = entry.action as Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>;
+      return action.groupId !== groupId || !hasIdentity(entry, identity);
+    });
   }
 
   /** Immutable view of the desired state, for the reconciler. */

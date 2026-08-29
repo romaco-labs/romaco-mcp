@@ -40,7 +40,9 @@ function readHostPositionId(data: unknown): string | undefined {
       ? (position as Record<string, unknown>).id
       : undefined,
   ];
-  return candidates.find((value): value is string => typeof value === 'string' && value.length > 0);
+  return candidates.find((value): value is string =>
+    typeof value === 'string' && value.length > 0 && value.length <= 256
+  );
 }
 
 export class OpenPaperPositionUseCase {

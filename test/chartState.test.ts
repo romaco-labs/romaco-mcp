@@ -119,6 +119,25 @@ describe('ChartStateJournal — drawings & alerts', () => {
     expect(snap.indicators).toHaveLength(1);
     expect(snap.alerts).toHaveLength(1);
   });
+
+  it('removes a drawing group only from exact chart identity', () => {
+    const other = {
+      chartId: createChartId('secondary'), symbol: 'MSFT', timeframe: '1h' as const,
+    };
+    const action = {
+      action: 'addDrawing' as const,
+      drawingType: 'horizontalLine',
+      groupId: 'romaco-mcp/manual',
+      points: [{ timestamp: 1, price: 10 }],
+    };
+    chartState.recordDrawing(action, AAPL_DAILY);
+    chartState.recordDrawing(action, other);
+
+    chartState.removeDrawingsByGroupForIdentity('romaco-mcp/manual', AAPL_DAILY);
+
+    expect(chartState.snapshot().drawings).toHaveLength(1);
+    expect(chartState.snapshot().drawings[0].identity).toEqual(other);
+  });
 });
 
 describe('ChartStateJournal — snapshot isolation', () => {
