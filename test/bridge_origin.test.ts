@@ -29,10 +29,11 @@ describe('isAllowedOrigin', () => {
     expect(isAllowedOrigin('http://[::1]:8080')).toBe(true);
   });
 
-  it('permite romaco.io y subdominios', () => {
+  it('permite solo origins Romaco exactos conocidos', () => {
     expect(isAllowedOrigin('https://romaco.io')).toBe(true);
     expect(isAllowedOrigin('https://www.romaco.io')).toBe(true);
     expect(isAllowedOrigin('https://app.romaco.io')).toBe(true);
+    expect(isAllowedOrigin('https://preview.romaco.io')).toBe(false);
   });
 
   it('rechaza origins desconocidos y lookalikes', () => {

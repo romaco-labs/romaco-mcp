@@ -4,7 +4,7 @@ import { LoadDatasetUseCase } from '../application/use-cases/loadDataset.js';
 import { LegacySessionProjection } from './LegacySessionProjection.js';
 import { LegacyMarketDataAdapter } from './LegacyMarketDataAdapter.js';
 import { BridgeChartAdapter } from '../adapters/outbound/chart/BridgeChartAdapter.js';
-import { bridge } from '../bridge.js';
+import { bridge } from './bridgeRuntime.js';
 import { SetupChartUseCase } from '../application/use-cases/setupChart.js';
 import { LegacyPresetCatalog } from './LegacyPresetCatalog.js';
 import { LegacyChartJournal } from './LegacyChartJournal.js';

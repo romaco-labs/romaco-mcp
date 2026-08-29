@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { bridge } from './bridge.js';
+import { bridge } from './bootstrap/bridgeRuntime.js';
 import { reconcileChartState } from './reconcile.js';
 import { createServer } from './server.js';
 
