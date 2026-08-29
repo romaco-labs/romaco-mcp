@@ -181,6 +181,36 @@ export const thesisDataSchema = z.object({
   disclaimer: z.string(),
 }).strict();
 
+export const compressedChartContextSchema = z.object({
+  identity: z.object({
+    chartId: z.string().nullable(),
+    symbol: z.string().nullable(),
+    timeframe: z.string().nullable(),
+  }).strict(),
+  lastPrice: z.number().nullable(),
+  totalCandles: z.number(),
+  visibleRange: z.object({
+    startIndex: z.number(),
+    endIndex: z.number(),
+    startTimestamp: z.number().nullable(),
+    endTimestamp: z.number().nullable(),
+  }).strict(),
+  panes: z.array(z.object({
+    id: z.string(),
+    alias: z.string(),
+    indicatorNames: z.array(z.string()),
+  }).strict()),
+  indicatorCount: z.number(),
+  drawingCount: z.number(),
+  alertCount: z.number(),
+  paperTradingActive: z.boolean(),
+  zoomLevel: z.number().nullable(),
+  renderBackend: z.string().nullable(),
+  locale: z.string().nullable(),
+  timezone: z.string().nullable(),
+  chartDimensions: z.object({ width: z.number(), height: z.number() }).strict().nullable(),
+}).strict();
+
 export const chartContextDataSchema = z.object({
   format: z.literal('concise'),
   chartId: z.string().min(1),
@@ -190,7 +220,7 @@ export const chartContextDataSchema = z.object({
     timeframe: timeframeSchema.optional(),
     datasetId: z.string().optional(),
   }).strict(),
-  context: z.record(z.unknown()),
+  context: compressedChartContextSchema,
 }).strict();
 
 export const listPanesDataSchema = z.object({

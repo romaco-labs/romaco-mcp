@@ -42,7 +42,9 @@ export interface AnnotateThesisResult {
   artifact: AnalysisRecord;
   dataset: DatasetRecord;
   chartIdentity: ChartIdentity;
+  groupId: string;
   drawings: readonly AddDrawing[];
+  resourceIds: readonly string[];
   idempotencyKey: string;
 }
 
@@ -145,6 +147,14 @@ export class AnnotateThesisUseCase {
       }
     }
 
-    return { artifact, dataset, chartIdentity: identity, drawings, idempotencyKey };
+    return {
+      artifact,
+      dataset,
+      chartIdentity: identity,
+      groupId: GROUP,
+      drawings,
+      resourceIds: result.resourceIds ?? [],
+      idempotencyKey,
+    };
   }
 }

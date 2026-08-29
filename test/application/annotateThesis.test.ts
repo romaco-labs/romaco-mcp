@@ -71,6 +71,8 @@ describe('AnnotateThesisUseCase', () => {
       `${artifact.analysisId}:primary:${visibleCandles[0].timestamp}:${visibleCandles[1].timestamp}:thesis-v1`,
     );
     expect(result.artifact).toBe(artifact);
+    expect(result.groupId).toBe('romaco-mcp/thesis');
+    expect(result.resourceIds).toEqual(['drawing-1']);
     expect(context.replaceDrawingGroup).toHaveBeenCalledOnce();
     expect(context.replaceDrawingGroup).toHaveBeenCalledWith(
       'romaco-mcp/thesis',

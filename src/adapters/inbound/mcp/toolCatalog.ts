@@ -53,7 +53,7 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.get-chart-context.v1',
       summary: 'Compressed or explicitly requested raw chart context.',
-      dataFields: ['format', 'chartId', 'context'],
+      dataFields: ['format', 'chartId', 'identity', 'context'],
       identityFields: ['chartId'],
       contentKinds: TEXT,
     },
@@ -371,7 +371,10 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.annotate.v1',
       summary: 'Atomic thesis drawing-group replacement result.',
-      dataFields: ['verdict', 'groupId', 'drawingIds', 'scope', 'replaced', 'failures'],
+      dataFields: [
+        'analysisId', 'datasetId', 'chartId', 'symbol', 'timeframe', 'provider',
+        'verdict', 'groupId', 'drawingIds', 'drawingCount', 'scope', 'idempotencyKey',
+      ],
       identityFields: ['chartId', 'datasetId', 'analysisId', 'symbol', 'timeframe'],
       contentKinds: TEXT,
       supportsNoop: true,
