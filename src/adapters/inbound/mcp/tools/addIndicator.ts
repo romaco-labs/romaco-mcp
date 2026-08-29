@@ -4,7 +4,7 @@ import { ApplicationError } from '../../../../application/errors.js';
 import type { ChartPort } from '../../../../application/ports/chart.js';
 import type { ChartJournalPort } from '../../../../application/ports/chartJournal.js';
 import { registerCatalogContractTool } from '../catalogContractTool.js';
-import type { RegisterContractToolOptions } from '../contracts.js';
+import type { RegisterContractToolOptions, ToolWarning } from '../contracts.js';
 import { addIndicatorDataSchema } from '../outputSchemas.js';
 
 function chartError(error: unknown): ApplicationError {
@@ -31,8 +31,8 @@ export function registerAddIndicator(
     'romaco_add_indicator',
     {
       description:
-        'Add one technical indicator to the connected chart and return the exact host indicatorId. ' +
-        'Use that ID for follow-up reads and removals.',
+        'Add one technical indicator to the connected chart and return the exact host indicatorId when supported. ' +
+        'A legacy host without stable IDs returns applied:true plus a partial warning; desired state remains journaled.',
       inputSchema: z.object({
         indicatorType: z.string().min(1),
         params: z.array(z.number()).optional(),
@@ -46,29 +46,40 @@ export function registerAddIndicator(
           { action: 'addIndicator', indicatorType, params },
           { expectedIdentity: identity },
         );
-        const indicatorId = result.resourceIds?.[0];
-        if (!indicatorId) {
-          throw new ApplicationError('PARTIAL_APPLY', 'Chart applied indicator without returning indicatorId.', {
-            recovery: {
-              action: 'retry',
-              instruction: 'Refresh chart context before any ID-based follow-up.',
-            },
+        if (!result.success) {
+          throw new ApplicationError('ACTION_DENIED', result.error ?? 'Chart rejected indicator write.', {
+            recovery: { action: 'retry', instruction: 'Refresh chart state before retrying the indicator write.' },
           });
         }
         const indicator = { type: indicatorType.toUpperCase(), params: params ?? [] };
-        journal.recordIndicator(indicator, identity, indicatorId);
+        const indicatorId = result.resourceIds?.[0] ?? null;
+        // Host write already succeeded. Record desired state even when an older
+        // host cannot return its resource ID; reporting an error would invite a
+        // duplicate retry and make reconnect lose the applied indicator.
+        journal.recordIndicator(indicator, identity, indicatorId ?? undefined);
+        const warnings: ToolWarning[] = indicatorId
+          ? []
+          : [{
+              code: 'RESOURCE_ID_UNAVAILABLE',
+              message:
+                'Chart applied indicator without a stable indicatorId. Refresh context for name-based follow-up or upgrade romaco-charts.',
+            }];
         return {
+          status: warnings.length ? 'partial' : 'ok',
           data: {
             indicator: { indicatorId, ...indicator },
             applied: true as const,
           },
-          summary: `${indicator.type}(${indicator.params.join(', ')}) added as ${indicatorId}.`,
+          summary: indicatorId
+            ? `${indicator.type}(${indicator.params.join(', ')}) added as ${indicatorId}.`
+            : `${indicator.type}(${indicator.params.join(', ')}) added; host returned no stable indicatorId.`,
           context: {
             chartId: identity.chartId,
             symbol: identity.symbol,
             timeframe: identity.timeframe,
             datasetId: identity.datasetId,
           },
+          warnings,
         };
       } catch (error) {
         throw chartError(error);

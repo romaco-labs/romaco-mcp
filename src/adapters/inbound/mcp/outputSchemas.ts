@@ -280,7 +280,7 @@ export const snapshotDataSchema = z.object({
 
 export const addIndicatorDataSchema = z.object({
   indicator: z.object({
-    indicatorId: z.string().min(1),
+    indicatorId: z.string().min(1).nullable(),
     type: z.string().min(1),
     params: z.array(z.number()),
   }).strict(),

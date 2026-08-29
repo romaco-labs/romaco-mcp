@@ -80,7 +80,7 @@ export const ROMACO_TOOL_CATALOG = [
     risk: { level: 'medium', financial: false, approval: 'explicit-user-intent' },
     output: {
       schemaId: 'romaco.add-indicator.v1',
-      summary: 'Applied indicator and host-assigned identity.',
+      summary: 'Applied indicator and host-assigned identity when available.',
       dataFields: ['indicator', 'applied'],
       identityFields: ['chartId', 'datasetId'],
       contentKinds: TEXT,

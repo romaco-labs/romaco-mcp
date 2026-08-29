@@ -104,3 +104,8 @@ requires fresh preview/approval for remaining alerts.
 
 No package version is claimed here until the chart release containing the full
 atomic contract is published and consumer-tested.
+
+Successful legacy indicator hosts that omit `indicatorId` remain compatible:
+MCP journals the applied desired state and returns `status: partial` with
+`RESOURCE_ID_UNAVAILABLE`. It never reports a failed write or invites blind
+retry after the host already mutated.
