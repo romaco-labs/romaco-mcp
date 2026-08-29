@@ -287,6 +287,30 @@ export const addIndicatorDataSchema = z.object({
   applied: z.literal(true),
 }).strict();
 
+export const addAlertDataSchema = z.object({
+  alert: z.object({
+    alertId: z.string().min(1),
+    price: z.number().finite(),
+    direction: z.enum(['above', 'below', 'cross']),
+    note: z.string().optional(),
+  }).strict(),
+  applied: z.literal(true),
+}).strict();
+
+export const removeIndicatorDataSchema = z.object({
+  indicatorId: z.string().min(1),
+  type: z.string().min(1),
+  params: z.array(z.number()),
+  removed: z.boolean(),
+}).strict();
+
+export const removeAlertDataSchema = z.object({
+  alertId: z.string().min(1),
+  price: z.number().finite(),
+  direction: z.enum(['above', 'below', 'cross']),
+  removed: z.boolean(),
+}).strict();
+
 export const indicatorValuesDataSchema = z.object({
   format: z.enum(['concise', 'full']),
   indicatorId: z.string().min(1),

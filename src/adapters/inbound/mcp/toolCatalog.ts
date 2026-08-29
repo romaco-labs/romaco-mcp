@@ -138,7 +138,7 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.add-alert.v1',
       summary: 'Applied price alert and host-assigned identity.',
-      dataFields: ['alert', 'applied', 'idempotencyKey'],
+      dataFields: ['alert', 'applied'],
       identityFields: ['chartId', 'datasetId'],
       contentKinds: TEXT,
     },

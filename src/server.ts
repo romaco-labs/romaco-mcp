@@ -65,10 +65,10 @@ export function createServer(
   registerAddIndicator(server, runtime.chart, runtime.journal, contractOptions);
   registerAddDrawing(server, runtime.addDrawing, contractOptions);
   registerSetZoom(server);       // also registers romaco_reset_view
-  registerAddAlert(server, runtime.chart, runtime.journal);
-  registerRemoveAlert(server, runtime.chart, runtime.journal);
+  registerAddAlert(server, runtime.chart, runtime.journal, contractOptions);
+  registerRemoveAlert(server, runtime.chart, runtime.journal, contractOptions);
   registerClearAlerts(server, runtime.clearAlerts, runtime.approvals, contractOptions);
-  registerRemoveIndicator(server, runtime.chart, runtime.journal);
+  registerRemoveIndicator(server, runtime.chart, runtime.journal, contractOptions);
   registerCaptureSnapshot(server, runtime.chart, contractOptions);
   registerOpenPaperPosition(
     server,

@@ -27,6 +27,10 @@ const TSLA: ChartIdentity = {
   chartId: createChartId('chart-b'), symbol: 'TSLA', timeframe: '1d',
 };
 
+function structured(result: Awaited<ReturnType<Client['callTool']>>): any {
+  return result.structuredContent;
+}
+
 class FakeChart implements ChartPort {
   readonly writes: ChartCommand[] = [];
   readonly groupWrites: ReplaceDrawingGroupCommand[] = [];
@@ -116,17 +120,25 @@ describe('injected reconnect desired-state workflow', () => {
     const journal = new LegacyChartJournal(new ChartStateJournal());
     await connect(chart, journal);
 
-    await client.callTool({
+    const addedIndicator = await client.callTool({
       name: 'romaco_add_indicator', arguments: { indicatorType: 'RSI', params: [14] },
     });
-    await client.callTool({
+    const indicatorId = structured(addedIndicator).data.indicator.indicatorId;
+    const addedAlert = await client.callTool({
       name: 'romaco_add_alert', arguments: { price: 150, direction: 'above' },
     });
-    await client.callTool({
-      name: 'romaco_remove_indicator', arguments: { indicatorType: 'RSI' },
+    const alertId = structured(addedAlert).data.alert.alertId;
+    const removedIndicator = await client.callTool({
+      name: 'romaco_remove_indicator', arguments: { indicatorId },
     });
-    await client.callTool({
-      name: 'romaco_remove_alert', arguments: { price: 150, direction: 'above' },
+    const removedAlert = await client.callTool({
+      name: 'romaco_remove_alert', arguments: { alertId },
+    });
+    expect(structured(removedIndicator)).toMatchObject({
+      status: 'ok', data: { indicatorId, type: 'RSI', removed: true },
+    });
+    expect(structured(removedAlert)).toMatchObject({
+      status: 'ok', data: { alertId, price: 150, direction: 'above', removed: true },
     });
     const writesBeforeReconnect = chart.writes.length;
 
