@@ -100,6 +100,43 @@ function identityGrader(task, trial) {
       return fail('batch top identity or partial-success correlation drifted');
     }
   }
+  if (task.id === 'S01_reconnect_symbol_scope') {
+    const desired = trial.facts.desiredAfter;
+    const entries = [...desired.drawings, ...desired.alerts];
+    if (
+      entries.length !== 2
+      || entries.some((entry) =>
+        entry.identity.chartId !== 'chart_aapl'
+        || entry.identity.symbol !== 'AAPL'
+        || entry.identity.timeframe !== '1d'
+      )
+      || trial.facts.reconcile.skippedIdentity !== 2
+    ) {
+      return fail('cross-symbol reconnect lost exact AAPL attribution');
+    }
+  }
+  if (task.id === 'S02_removed_indicator_stays_removed') {
+    const refreshed = trial.facts.desiredAfterRefresh.indicators[0];
+    const removed = structured(trial.facts.removed).data;
+    if (
+      refreshed?.resourceIds?.[0] !== trial.facts.refreshedId
+      || removed.indicatorId !== trial.facts.refreshedId
+      || removed.type !== 'RSI'
+    ) {
+      return fail('indicator reconnect did not refresh or remove exact host ID');
+    }
+  }
+  if (task.id === 'S03_removed_alert_stays_removed') {
+    const refreshed = trial.facts.desiredAfterRefresh.alerts[0];
+    const removed = structured(trial.facts.removed).data;
+    if (
+      refreshed?.resourceIds?.[0] !== trial.facts.refreshedId
+      || removed.alertId !== trial.facts.refreshedId
+      || removed.direction !== 'above'
+    ) {
+      return fail('alert reconnect did not refresh or remove exact host ID');
+    }
+  }
   if (task.id === 'L07_pattern_replace') {
     const replacements = trial.chartCalls.filter((call) => call.operation === 'replaceDrawingGroup');
     const invalid = replacements.find((call) =>
@@ -229,6 +266,43 @@ function terminalStateGrader(task, trial) {
       return fail('paper receipt replay, conflict, or terminal position state drifted');
     }
   }
+  if (task.id === 'S01_reconnect_symbol_scope') {
+    if (
+      trial.facts.reconcile.status !== 'reconciled'
+      || trial.facts.reconcile.applied !== 0
+      || trial.chartState.drawings.length !== 0
+      || trial.chartState.alerts.length !== 0
+      || JSON.stringify(trial.facts.desiredAfter) !== JSON.stringify(trial.facts.desiredBefore)
+    ) {
+      return fail('cross-symbol reconnect mutated host or desired state');
+    }
+  }
+  if (task.id === 'S02_removed_indicator_stays_removed') {
+    if (
+      trial.facts.refreshed.applied !== 0
+      || trial.facts.writesAfterRefresh !== trial.facts.writesBeforeRefresh
+      || trial.facts.writesAfterRemove !== trial.facts.writesBeforeRefresh + 1
+      || trial.facts.finalReconnect.status !== 'empty'
+      || trial.facts.writesAfterFinalReconnect !== trial.facts.writesAfterRemove
+      || trial.facts.finalDesired.indicators.length !== 0
+      || trial.chartState.indicators.length !== 0
+    ) {
+      return fail('removed indicator returned or caused reconnect write');
+    }
+  }
+  if (task.id === 'S03_removed_alert_stays_removed') {
+    if (
+      trial.facts.refreshed.applied !== 0
+      || trial.facts.writesAfterRefresh !== trial.facts.writesBeforeRefresh
+      || trial.facts.writesAfterRemove !== trial.facts.writesBeforeRefresh + 1
+      || trial.facts.finalReconnect.status !== 'empty'
+      || trial.facts.writesAfterFinalReconnect !== trial.facts.writesAfterRemove
+      || trial.facts.finalDesired.alerts.length !== 0
+      || trial.chartState.alerts.length !== 0
+    ) {
+      return fail('removed alert returned or caused reconnect write');
+    }
+  }
   if (task.id === 'L07_pattern_replace') {
     const owned = trial.chartState.drawings.filter(
       (drawing) => drawing.groupId === trial.facts.expectedGroupId,
@@ -310,6 +384,12 @@ function financialGrader(task, trial) {
       && position.takeProfit > position.stopLoss
       ? pass('paper-only position payload remains positive and directional')
       : fail('paper position financial fields are invalid');
+  }
+  if (task.id === 'S01_reconnect_symbol_scope') {
+    return trial.facts.writesAfterReconnect === trial.facts.writesBeforeReconnect
+      && trial.facts.reconcile.applied === 0
+      ? pass('TSLA reconnect performs zero AAPL drawing or alert writes')
+      : fail('cross-symbol reconnect wrote AAPL overlay state');
   }
   return pass('no additional financial invariant for task');
 }

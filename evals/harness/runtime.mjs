@@ -7,6 +7,7 @@ import { AnalyzeBatchUseCase } from '../../dist/application/use-cases/analyzeBat
 import { AddDrawingUseCase } from '../../dist/application/use-cases/addDrawing.js';
 import { ClearAgentDrawingsUseCase } from '../../dist/application/use-cases/clearAgentDrawings.js';
 import { OpenPaperPositionUseCase } from '../../dist/application/use-cases/openPaperPosition.js';
+import { ReconcileChartStateUseCase } from '../../dist/application/use-cases/reconcileChartState.js';
 import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset.js';
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
@@ -75,7 +76,15 @@ class EvalChartJournal {
   constructor() {
     this.indicators = [];
     this.drawings = [];
+    this.alerts = [];
     this.groups = new Map();
+  }
+
+  sameIdentity(left, right) {
+    return left.chartId === right.chartId
+      && left.symbol === right.symbol
+      && left.timeframe === right.timeframe
+      && left.datasetId === right.datasetId;
   }
 
   recordIndicator(indicator, identity, resourceId) {
@@ -84,6 +93,29 @@ class EvalChartJournal {
 
   recordDrawing(drawing, identity, resourceId) {
     this.drawings.push({ drawing: structuredClone(drawing), identity: structuredClone(identity), resourceId });
+  }
+
+  recordAlert(alert, identity, resourceId) {
+    this.alerts.push({ alert: structuredClone(alert), identity: structuredClone(identity), resourceId });
+  }
+
+  removeIndicator(resourceId, indicatorType, params = []) {
+    const exact = this.indicators.findIndex((entry) => entry.resourceId === resourceId);
+    const fallback = this.indicators.findIndex((entry) =>
+      entry.indicator.type.toLowerCase() === indicatorType.toLowerCase()
+      && JSON.stringify(entry.indicator.params ?? []) === JSON.stringify(params),
+    );
+    const index = exact >= 0 ? exact : fallback;
+    if (index >= 0) this.indicators.splice(index, 1);
+  }
+
+  removeAlert(resourceId, price, direction) {
+    const exact = this.alerts.findIndex((entry) => entry.resourceId === resourceId);
+    const fallback = this.alerts.findIndex((entry) =>
+      entry.alert.price === price && (entry.alert.options?.direction ?? 'cross') === direction,
+    );
+    const index = exact >= 0 ? exact : fallback;
+    if (index >= 0) this.alerts.splice(index, 1);
   }
 
   replaceDrawingGroup(groupId, drawings, identity, idempotencyKey, resourceIds) {
@@ -119,6 +151,68 @@ class EvalChartJournal {
       this.groups.delete(groupId);
     }
   }
+
+  snapshot() {
+    return {
+      indicators: this.indicators.map((entry) => ({
+        command: { action: 'addIndicator', indicatorType: entry.indicator.type, params: entry.indicator.params },
+        identity: structuredClone(entry.identity),
+        resourceIds: entry.resourceId ? [entry.resourceId] : [],
+      })),
+      drawings: this.drawings.map((entry) => ({
+        command: structuredClone(entry.drawing),
+        identity: structuredClone(entry.identity),
+        resourceIds: entry.resourceId ? [entry.resourceId] : [],
+      })),
+      drawingGroups: [...this.groups.entries()].map(([groupId, group]) => ({
+        command: {
+          groupId,
+          drawings: structuredClone(group.drawings),
+          expectedIdentity: structuredClone(group.identity),
+          idempotencyKey: group.idempotencyKey,
+        },
+        identity: structuredClone(group.identity),
+        resourceIds: structuredClone(group.resourceIds),
+      })),
+      alerts: this.alerts.map((entry) => ({
+        command: structuredClone(entry.alert),
+        identity: structuredClone(entry.identity),
+        resourceIds: entry.resourceId ? [entry.resourceId] : [],
+      })),
+    };
+  }
+
+  bindReplayedResources(command, identity, resourceIds) {
+    const resourceId = resourceIds[0];
+    if ('idempotencyKey' in command) {
+      const group = this.groups.get(command.groupId);
+      if (group && this.sameIdentity(group.identity, identity)) group.resourceIds = structuredClone(resourceIds);
+      return;
+    }
+    if (!resourceId) return;
+    if (command.action === 'addIndicator') {
+      const entry = this.indicators.find((candidate) =>
+        this.sameIdentity(candidate.identity, identity)
+        && candidate.indicator.type.toLowerCase() === command.indicatorType.toLowerCase()
+        && JSON.stringify(candidate.indicator.params ?? []) === JSON.stringify(command.params ?? []),
+      );
+      if (entry) entry.resourceId = resourceId;
+    } else if (command.action === 'addDrawing') {
+      const entry = this.drawings.find((candidate) =>
+        this.sameIdentity(candidate.identity, identity)
+        && candidate.drawing.drawingType === command.drawingType
+        && JSON.stringify(candidate.drawing.points) === JSON.stringify(command.points),
+      );
+      if (entry) entry.resourceId = resourceId;
+    } else if (command.action === 'addAlert') {
+      const entry = this.alerts.find((candidate) =>
+        this.sameIdentity(candidate.identity, identity)
+        && candidate.alert.price === command.price
+        && (candidate.alert.options?.direction ?? 'cross') === (command.options?.direction ?? 'cross'),
+      );
+      if (entry) entry.resourceId = resourceId;
+    }
+  }
 }
 
 export function createEvalRuntime({ marketData, chart }) {
@@ -148,6 +242,7 @@ export function createEvalRuntime({ marketData, chart }) {
     chart,
     new InMemoryPaperPositionIdempotencyStore(),
   );
+  const reconcileChart = new ReconcileChartStateUseCase(chart, journal, async () => undefined);
   const analyzeBatch = new AnalyzeBatchUseCase(
     loadDataset,
     resolveThesis,
@@ -174,6 +269,7 @@ export function createEvalRuntime({ marketData, chart }) {
       addDrawing,
       clearAgentDrawings,
       openPaperPosition,
+      reconcileChart,
     },
     projection,
     journal,

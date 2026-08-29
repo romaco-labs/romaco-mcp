@@ -107,6 +107,7 @@ async function runWithHarness({ chart, execute, marketFixtures = new Map() }) {
       journal: {
         indicators: structuredClone(built.journal.indicators),
         drawings: structuredClone(built.journal.drawings),
+        alerts: structuredClone(built.journal.alerts),
         groups: Object.fromEntries(built.journal.groups),
       },
       evidenceNumbers: facts.evidenceNumbers ?? [],
@@ -376,6 +377,123 @@ async function s04() {
         retry: approval.applied,
         analysisId,
         userDrawingId: 'user_1',
+      };
+    },
+  });
+}
+
+async function s01() {
+  const aapl = realCandles('AAPL').slice(-120);
+  const tsla = realCandles('TSLA').slice(-120);
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', aapl),
+    execute: async ({ harness, chart, runtime, journal }) => {
+      const drawing = await harness.callTool('romaco_add_drawing', {
+        drawingType: 'trendline',
+        points: [
+          { timestamp: aapl.at(-20).timestamp * 1_000, price: aapl.at(-20).low },
+          { timestamp: aapl.at(-1).timestamp * 1_000, price: aapl.at(-1).high },
+        ],
+        groupId: 'romaco-mcp/eval-aapl',
+      });
+      const alert = await harness.callTool('romaco_add_alert', {
+        price: aapl.at(-1).close,
+        direction: 'above',
+      });
+      const desiredBefore = journal.snapshot();
+      chart.identity = { chartId: 'chart_tsla', symbol: 'TSLA', timeframe: '1d' };
+      chart.visibleCandles = structuredClone(tsla);
+      chart.drawings = [];
+      chart.indicators = [];
+      chart.alerts = [];
+      const writesBeforeReconnect = chart.calls.filter(
+        (call) => call.operation === 'execute' || call.operation === 'replaceDrawingGroup',
+      ).length;
+      const reconcile = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
+      const writesAfterReconnect = chart.calls.filter(
+        (call) => call.operation === 'execute' || call.operation === 'replaceDrawingGroup',
+      ).length;
+      return {
+        drawing,
+        alert,
+        desiredBefore,
+        desiredAfter: journal.snapshot(),
+        reconcile,
+        writesBeforeReconnect,
+        writesAfterReconnect,
+      };
+    },
+  });
+}
+
+async function s02() {
+  const candles = realCandles('AAPL').slice(-120);
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness, chart, runtime, journal }) => {
+      const added = await harness.callTool('romaco_add_indicator', {
+        indicatorType: 'RSI', params: [14],
+      });
+      const originalId = structured(added).data.indicator.indicatorId;
+      const refreshedId = 'indicator_reconnected';
+      chart.indicators = [{ id: refreshedId, name: 'RSI', type: 'RSI', params: [14] }];
+      const writesBeforeRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
+      const refreshed = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
+      const writesAfterRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
+      const desiredAfterRefresh = journal.snapshot();
+      const removed = await harness.callTool('romaco_remove_indicator', { indicatorId: refreshedId });
+      const writesAfterRemove = chart.calls.filter((call) => call.operation === 'execute').length;
+      const finalReconnect = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
+      const writesAfterFinalReconnect = chart.calls.filter((call) => call.operation === 'execute').length;
+      return {
+        added,
+        removed,
+        originalId,
+        refreshedId,
+        refreshed,
+        desiredAfterRefresh,
+        finalReconnect,
+        finalDesired: journal.snapshot(),
+        writesBeforeRefresh,
+        writesAfterRefresh,
+        writesAfterRemove,
+        writesAfterFinalReconnect,
+      };
+    },
+  });
+}
+
+async function s03() {
+  const candles = realCandles('AAPL').slice(-120);
+  const price = candles.at(-1).close;
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness, chart, runtime, journal }) => {
+      const added = await harness.callTool('romaco_add_alert', { price, direction: 'above' });
+      const originalId = structured(added).data.alert.alertId;
+      const refreshedId = 'alert_reconnected';
+      chart.alerts = [{ id: refreshedId, price, direction: 'above' }];
+      const writesBeforeRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
+      const refreshed = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
+      const writesAfterRefresh = chart.calls.filter((call) => call.operation === 'execute').length;
+      const desiredAfterRefresh = journal.snapshot();
+      const removed = await harness.callTool('romaco_remove_alert', { alertId: refreshedId });
+      const writesAfterRemove = chart.calls.filter((call) => call.operation === 'execute').length;
+      const finalReconnect = await runtime.reconcileChart.execute({ attempts: 1, delayMs: 0 });
+      const writesAfterFinalReconnect = chart.calls.filter((call) => call.operation === 'execute').length;
+      return {
+        added,
+        removed,
+        originalId,
+        refreshedId,
+        refreshed,
+        desiredAfterRefresh,
+        finalReconnect,
+        finalDesired: journal.snapshot(),
+        writesBeforeRefresh,
+        writesAfterRefresh,
+        writesAfterRemove,
+        writesAfterFinalReconnect,
       };
     },
   });
@@ -683,6 +801,9 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['drawing-validation', l04],
   ['annotate-atomic-idempotent', l05],
   ['group-preserves-user-state', s04],
+  ['reconnect-symbol-scope', s01],
+  ['remove-indicator-reconnect', s02],
+  ['remove-alert-reconnect', s03],
   ['cross-symbol-hard-stop', l06],
   ['pattern-group-replace', l07],
   ['snapshot-gate', l08],

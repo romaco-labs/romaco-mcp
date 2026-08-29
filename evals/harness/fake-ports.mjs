@@ -107,6 +107,23 @@ export class FakeChartPort {
     this.calls.push({ operation: 'getContext', includeCandles });
     return {
       identity: copy(this.identity),
+      totalCandles: this.visibleCandles.length,
+      indicators: this.indicators.map((indicator) => ({
+        id: indicator.id,
+        type: indicator.type ?? indicator.name,
+        params: copy(indicator.params ?? []),
+      })),
+      drawings: this.drawings.map((drawing) => ({
+        id: drawing.id,
+        type: drawing.type ?? drawing.drawingType,
+        points: copy(drawing.points ?? []),
+        groupId: drawing.groupId,
+      })),
+      alerts: this.alerts.map((alert) => ({
+        id: alert.id,
+        price: alert.price,
+        direction: alert.direction ?? alert.options?.direction ?? 'cross',
+      })),
       ...(includeCandles ? { visibleCandles: copy(this.visibleCandles) } : {}),
       raw: {
         ...copy(this.rawContext),
