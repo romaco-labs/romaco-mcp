@@ -22,7 +22,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "eval:validate": "node scripts/validate-evals.mjs",
-    "eval:offline": "node scripts/run-offline-evals.mjs",
+    "eval:offline": "npm run build && node scripts/run-offline-evals.mjs",
     "verify:release-version": "node scripts/verify-release-version.mjs",
     "bench": "vitest bench --run"
   },

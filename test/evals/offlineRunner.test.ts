@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { OfflineEvalRunner } from '../../evals/harness/offline-runner.mjs';
+import { DETERMINISTIC_GRADERS } from '../../evals/graders/deterministic.mjs';
+import { SUPPORTED_OFFLINE_TRIALS } from '../../evals/trials/supported.mjs';
 import {
   FakeAnalysisGatewayPort,
   FakeChartPort,
@@ -24,6 +26,23 @@ describe('offline eval harness foundation', () => {
     await expect(new OfflineEvalRunner().run({ requireAll: true })).rejects.toThrow(
       /28 eval task\(s\) are still planned/,
     );
+  });
+
+  it('executes and grades only honestly runnable tasks', async () => {
+    const report = await new OfflineEvalRunner({
+      trials: SUPPORTED_OFFLINE_TRIALS,
+      graders: DETERMINISTIC_GRADERS,
+    }).run();
+    expect(report).toMatchObject({
+      selectedTasks: 28,
+      executed: 9,
+      passed: 9,
+      failed: 0,
+      planned: 19,
+      taskSuccessRate: 1,
+    });
+    expect(report.results.filter((result) => result.status === 'passed')).toHaveLength(9);
+    expect(report.results.filter((result) => result.status === 'planned')).toHaveLength(19);
   });
 
   it('provides deterministic fakes matching current outbound port shapes', async () => {

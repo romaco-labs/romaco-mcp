@@ -73,6 +73,7 @@ export class FakeChartPort {
     alerts = [],
     snapshotDataUrl = 'data:image/png;base64,ZmFrZQ==',
     fault = null,
+    rawContext = {},
   }) {
     this.identity = copy(identity);
     this.connected = connected;
@@ -83,6 +84,7 @@ export class FakeChartPort {
     this.paperPositions = [];
     this.snapshotDataUrl = snapshotDataUrl;
     this.fault = fault;
+    this.rawContext = copy(rawContext);
     this.calls = [];
     this.counter = 0;
     this.idempotency = new Map();
@@ -107,8 +109,9 @@ export class FakeChartPort {
       identity: copy(this.identity),
       ...(includeCandles ? { visibleCandles: copy(this.visibleCandles) } : {}),
       raw: {
-        indicators: copy(this.indicators),
-        drawings: copy(this.drawings),
+        ...copy(this.rawContext),
+        existingIndicators: copy(this.indicators),
+        existingDrawings: copy(this.drawings),
         alerts: copy(this.alerts),
         paperPositions: copy(this.paperPositions),
       },
