@@ -135,6 +135,9 @@ export function registerDrawPattern(server: McpServer, chart: ChartPort): void {
           expectedIdentity: expectedIdentity!,
           idempotencyKey,
         });
+        if (!replaced.success) {
+          throw new Error(replaced.error ?? 'Chart rejected atomic pattern replacement.');
+        }
         const identity = expectedIdentity!;
         chartState.replaceDrawingGroup({
           action: 'replaceAgentDrawingGroup',

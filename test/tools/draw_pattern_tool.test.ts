@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { createTestClient } from './_client.js';
 import { bridge } from '../../src/bridge.js';
 import { chartState } from '../../src/chartState.js';
@@ -6,6 +9,9 @@ import { session } from '../../src/session.js';
 import { doubleTopCandles, headShouldersCandles } from '../compression/fixtures.js';
 import type { LoadResponse } from '../../src/data/types.js';
 import type { BridgeAction, BridgeAgentDrawingInput } from '../../src/types.js';
+import type { ChartPort } from '../../src/application/ports/chart.js';
+import { createChartId } from '../../src/domain/chart/model.js';
+import { registerDrawPattern } from '../../src/tools/draw_pattern.js';
 
 // Chart speaks milliseconds; the MCP session candles are unix seconds. The
 // tool must sniff the mismatch and scale pattern timestamps ×1000.
@@ -264,6 +270,44 @@ describe('romaco_draw_pattern', () => {
       expect(chartState.snapshot().drawings).toHaveLength(0);
     } finally {
       await close();
+    }
+  });
+
+  it('fails closed when a ChartPort returns success:false instead of throwing', async () => {
+    loadSession(headShouldersCandles());
+    const identity = { chartId: createChartId('typed-port'), symbol: 'TEST', timeframe: '1h' as const };
+    const chart: ChartPort = {
+      isConnected: () => true,
+      getIdentity: async () => identity,
+      getContext: async () => ({
+        identity,
+        visibleCandles: [chartCandle(CHART_ANCHOR - 86_400_000), chartCandle(CHART_ANCHOR)],
+      }),
+      execute: async () => ({ success: true }),
+      replaceDrawingGroup: async () => ({ success: false, error: 'host policy denied' }),
+      captureSnapshot: async (format) => ({ format, dataUrl: '' }),
+    };
+    const server = new McpServer({ name: 'draw-pattern-port-test', version: '0.0.0' });
+    registerDrawPattern(server, chart);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await server.connect(serverTransport);
+    const client = new Client({ name: 'test', version: '0.0.0' }, { capabilities: {} });
+    await client.connect(clientTransport);
+    try {
+      const result = await client.callTool({
+        name: 'romaco_draw_pattern',
+        arguments: { kind: 'head_shoulders' },
+      });
+      const text = (result.content as Array<{ type: string; text?: string }>)
+        .filter((block) => block.type === 'text')
+        .map((block) => block.text ?? '')
+        .join('\n');
+      expect(result.isError).toBe(true);
+      expect(text).toContain('host policy denied');
+      expect(chartState.snapshot().drawingGroups).toHaveLength(0);
+    } finally {
+      await client.close();
+      await server.close();
     }
   });
 });
