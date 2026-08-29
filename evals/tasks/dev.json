@@ -7,8 +7,8 @@
     "prompt": "Analyze the supplied AAPL daily candles without opening or modifying a browser chart. Report trend, last price, and strongest nearby level.",
     "oracleWorkflow": "raw-load-analyze",
     "fixtureRefs": ["real-aapl"],
-    "graderRefs": ["contract", "identity", "claims", "trace", "budget"],
-    "expectedOutcomes": ["analysis binds to returned datasetId", "zero chart and network calls", "numeric claims come from structured output"],
+    "graderRefs": ["contract", "identity", "evidence-conformance", "trace", "budget"],
+    "expectedOutcomes": ["analysis binds to returned datasetId", "zero chart and network calls", "declared numeric evidence comes from structured output"],
     "budget": { "maxToolCalls": 3, "maxResultBytes": 10000, "maxDurationMs": 2500 }
   },
   {
@@ -55,7 +55,7 @@
     "prompt": "Evaluate this flat synthetic market and give a thesis. Do not manufacture a trade when evidence is weak.",
     "oracleWorkflow": "flat-stand-aside",
     "fixtureRefs": ["flat-market"],
-    "graderRefs": ["contract", "financial-invariants", "claims", "safety", "budget"],
+    "graderRefs": ["contract", "financial-invariants", "safety", "budget"],
     "expectedOutcomes": ["verdict is stand_aside", "setup is null", "no entry stop or target claims"],
     "budget": { "maxToolCalls": 3, "maxResultBytes": 10000, "maxDurationMs": 2500 }
   },

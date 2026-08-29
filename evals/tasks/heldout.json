@@ -67,7 +67,7 @@
     "prompt": "Load AAPL, then TSLA, then retrieve the earlier AAPL artifact by its exact analysisId without relying on last-loaded state.",
     "oracleWorkflow": "explicit-dataset-race",
     "fixtureRefs": ["real-aapl", "real-tsla"],
-    "graderRefs": ["contract", "identity", "terminal-state", "claims", "budget"],
+    "graderRefs": ["contract", "identity", "terminal-state", "budget"],
     "expectedOutcomes": ["requested AAPL artifact is returned", "explicit lookup leaves TSLA active state unchanged", "analysisId points to AAPL datasetId"],
     "budget": { "maxToolCalls": 4, "maxResultBytes": 14000, "maxDurationMs": 3500 }
   },

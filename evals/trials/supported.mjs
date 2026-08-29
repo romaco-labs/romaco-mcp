@@ -72,7 +72,7 @@ async function runWithHarness({ chart, execute }) {
         indicators: structuredClone(built.journal.indicators),
         groups: Object.fromEntries(built.journal.groups),
       },
-      claims: facts.claims ?? [],
+      evidenceNumbers: facts.evidenceNumbers ?? [],
       facts,
     };
   } finally {
@@ -93,7 +93,7 @@ async function h01() {
         setup,
         expectedSymbol: 'AAPL',
         expectedCandleCount: candles.length,
-        claims: [
+        evidenceNumbers: [
           data.analysis.meta.last_price,
           ...(data.analysis.levels.support.slice(0, 1)),
         ],
@@ -139,7 +139,7 @@ async function h05() {
         symbol: 'FLAT', preset: 'clean', timeframe: '1h', source: 'raw', rawCandles: candles,
       });
       const thesis = await harness.callTool('romaco_thesis');
-      return { setup, thesis, expectedVerdict: 'stand_aside', claims: [] };
+      return { setup, thesis, expectedVerdict: 'stand_aside' };
     },
   });
 }
@@ -286,7 +286,6 @@ async function s05() {
           analysisId: activeAnalysisAfter?.analysisId,
           datasetId: activeDatasetAfter?.datasetId,
         },
-        claims: [],
       };
     },
   });

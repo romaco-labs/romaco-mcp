@@ -20,9 +20,14 @@
     "description": "Require zero cross-symbol or unauthorized writes and enforce single-use approvals."
   },
   {
-    "id": "claims",
+    "id": "evidence-conformance",
     "status": "runnable",
-    "description": "Match numeric final-answer claims to tool evidence within task tolerances."
+    "description": "Check trial-declared numeric evidence against structured tool output; this does not grade agent prose."
+  },
+  {
+    "id": "claims",
+    "status": "planned",
+    "description": "Match numeric claims from an actual agent final answer to tool evidence within task tolerances."
   },
   {
     "id": "trace",

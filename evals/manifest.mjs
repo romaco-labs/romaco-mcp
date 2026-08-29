@@ -52,12 +52,14 @@ function positiveInteger(value) {
 export function validateEvalManifest(data = loadEvalManifest()) {
   const errors = [];
   const graderIds = new Set();
+  const graderStatuses = new Map();
   const fixtureIds = new Set();
 
   for (const grader of data.graders) {
     if (typeof grader.id !== 'string' || !grader.id) errors.push('grader id must be non-empty');
     if (graderIds.has(grader.id)) errors.push(`duplicate grader id: ${grader.id}`);
     graderIds.add(grader.id);
+    graderStatuses.set(grader.id, grader.status);
     if (!['planned', 'runnable'].includes(grader.status)) {
       errors.push(`grader ${grader.id} has invalid status: ${grader.status}`);
     }
@@ -124,6 +126,9 @@ export function validateEvalManifest(data = loadEvalManifest()) {
     } else {
       for (const graderRef of task.graderRefs) {
         if (!graderIds.has(graderRef)) errors.push(`task ${task.id} references unknown grader: ${graderRef}`);
+        else if (task.status === 'runnable' && graderStatuses.get(graderRef) !== 'runnable') {
+          errors.push(`runnable task ${task.id} references non-runnable grader: ${graderRef}`);
+        }
       }
       if (!task.graderRefs.includes('budget')) errors.push(`task ${task.id} must include budget grader`);
     }

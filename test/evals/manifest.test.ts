@@ -20,7 +20,7 @@ describe('agent eval manifest', () => {
       },
       runnable: 11,
       planned: 17,
-      graderCount: 10,
+      graderCount: 11,
       fixtureCount: 13,
     });
     expect(EXPECTED_EVAL_COUNTS.total).toBe(28);
@@ -47,5 +47,11 @@ describe('agent eval manifest', () => {
     };
     expect(() => validateEvalManifest(manifest)).toThrow(/unknown fixture/);
     expect(() => validateEvalManifest(manifest)).toThrow(/unknown grader/);
+  });
+
+  it('rejects runnable tasks backed by planned graders', () => {
+    const manifest = loadEvalManifest();
+    manifest.tasks[0] = { ...manifest.tasks[0], graderRefs: ['claims', 'budget'] };
+    expect(() => validateEvalManifest(manifest)).toThrow(/references non-runnable grader: claims/);
   });
 });
