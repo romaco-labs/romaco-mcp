@@ -90,7 +90,7 @@ describe('SetupChartUseCase', () => {
   it('reports each indicator honestly and journals successes only', async () => {
     const execute = vi.fn()
       .mockResolvedValueOnce({ success: true, resourceIds: ['ema-20'] })
-      .mockRejectedValueOnce(new Error('host denied RSI'));
+      .mockResolvedValueOnce({ success: false, error: 'host denied RSI' });
     const live = chart({ execute });
     const recordIndicator = vi.fn();
     const useCase = new SetupChartUseCase(

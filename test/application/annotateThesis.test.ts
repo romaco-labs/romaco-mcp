@@ -126,6 +126,15 @@ describe('AnnotateThesisUseCase', () => {
     expect(context.replaceDrawingGroup).not.toHaveBeenCalled();
   });
 
+  it('journals nothing when a ChartPort returns success:false', async () => {
+    const context = await fixture({
+      replaceDrawingGroup: vi.fn(async () => ({ success: false, error: 'host policy denied' })),
+    });
+
+    await expect(context.useCase.execute()).rejects.toThrow(/host policy denied/i);
+    expect(context.replaceDrawingGroup).not.toHaveBeenCalled();
+  });
+
   it('keeps same-view retries stable and changes key when viewport anchors change', async () => {
     const getContext = vi.fn()
       .mockResolvedValueOnce({

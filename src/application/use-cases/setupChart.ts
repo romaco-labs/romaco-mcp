@@ -93,6 +93,7 @@ export class SetupChartUseCase {
           { action: 'addIndicator', indicatorType: indicator.type, params: indicator.params },
           { expectedIdentity: identity },
         );
+        if (!result.success) throw new Error(result.error ?? 'Chart rejected indicator setup.');
         const resourceId = result.resourceIds?.[0];
         this.journal.recordIndicator(indicator, identity, resourceId);
         indicators.push({ ...indicator, success: true, resourceId });

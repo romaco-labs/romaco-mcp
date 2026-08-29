@@ -123,6 +123,9 @@ export class AnnotateThesisUseCase {
       expectedIdentity: identity,
       idempotencyKey,
     });
+    if (!result.success) {
+      throw new Error(result.error ?? 'Chart rejected atomic thesis replacement.');
+    }
     this.journal.replaceDrawingGroup(
       GROUP,
       drawings,
