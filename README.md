@@ -12,7 +12,7 @@ npx @romaco/mcp
 
 ## Philosophy
 
-Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Most default tool payloads stay under **2 KB**; `romaco_analyze_market` is the deliberate exception at **2.4–4.1 KB** across the eight recorded 400-bar fixtures. Raw payloads (full chart state, snapshots, all-bar indicator series) exist but are **gated** behind `acknowledgeHighTokenCost: true` — the agent must consciously opt in and the user must explicitly request raw data.
+Romaco MCP is **compression-first**. Tools return features and decisions, not raw OHLCV. Most default tool payloads stay under **2 KB**; `romaco_analyze_market` is the deliberate exception at **2.4–4.1 KB** across the eight recorded 400-bar fixtures. Large payloads such as snapshots, visible-candle arrays, and all-bar indicator series are **gated** behind `acknowledgeHighTokenCost: true`. Full raw chart-state export is disabled until an explicitly authorized host contract exists.
 
 The rule: *the agent never computes, it always queries*. An agent reasoning over computed features can't invent the numbers underneath its analysis — it reads the RSI, the levels, the last price from code, not from its imagination. It still *interprets* them, so the thesis can still be wrong: grounding the data is not the same as grounding the conclusion. But an agent given a 70 KB raw OHLCV dump will burn its context window before it can finish a thought — and invent half the numbers on the way.
 
@@ -21,7 +21,7 @@ The rule: *the agent never computes, it always queries*. An agent reasoning over
 | Tool | Default | Gated raw (with `acknowledgeHighTokenCost:true`) |
 |---|---|---|
 | `romaco_analyze_market` | 2.4–4.1 KB on recorded 400-bar fixtures | — |
-| `romaco_thesis` | <2 KB computed bull/bear debate + verdict + setup | enhanced server-side thesis (Pro) |
+| `romaco_thesis` | <2 KB computed bull/bear debate + verdict + setup | — |
 | `romaco_find_levels` | <500 B | — |
 | `romaco_detect_patterns` | <2 KB (trimmed hits) | full hits with anchor `points[]` |
 | `romaco_setup_chart` | <5 KB (setup log + summary) | — |
@@ -29,7 +29,7 @@ The rule: *the agent never computes, it always queries*. An agent reasoning over
 | `romaco_calculate_position_size` | <1 KB | — |
 | `romaco_list_templates` | ~4.5 KB static catalog | — |
 | `romaco_list_panes` | <1 KB | — |
-| `romaco_get_chart_context` | ~1 KB snapshot | ~80 KB full payload |
+| `romaco_get_chart_context` | ~1 KB snapshot | disabled; returns `ACTION_DENIED` |
 | `romaco_get_visible_candles` | <1 KB range summary | ~70 KB raw OHLCV |
 | `romaco_get_indicator_values` | <500 B last/prev/delta/state | ~10 KB per-bar series |
 | `romaco_capture_snapshot` | error (must ack) | 300–800 KB base64 image |
@@ -73,7 +73,7 @@ function App() {
 }
 ```
 
-See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a complete setup. With `<McpBridge />` mounted, the chart-bridge tools (`add_indicator`, `add_drawing`, `add_alert`, `capture_snapshot`, …) become available.
+See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a complete setup. With `<McpBridge />` mounted, the chart-bridge tools (`add_indicator`, `add_drawing`, `add_alert`, `capture_snapshot`, …) become available. Atomic thesis/pattern annotation additionally requires the host action documented in [Chart bridge compatibility](./docs/CHART_BRIDGE_COMPATIBILITY.md); older hosts fail closed instead of falling back to sequential drawing writes.
 
 ### Data cache
 
@@ -212,9 +212,10 @@ and capture a snapshot so I can see it.
 | WebSocket port | `7399` | `--port 3200` or `ROMACO_MCP_PORT=3200` |
 | `ROMACO_MCP_BRIDGE_AUTH` | `auto` | `auto`, `required`, or explicit `legacy` compatibility mode |
 | `ROMACO_MCP_BRIDGE_TOKEN` | _(none)_ | Canonical base64url encoding of exactly 32 random bytes |
-| `ROMACO_TOKEN` | _(none → free)_ | Unlocks Pro against a self-hosted ROA-I backend (hosted tier coming soon) |
-| `ROMACO_API_URL` | `http://localhost:8000` | ROA-I backend endpoint (self-hosted) |
+| `ROMACO_TOKEN` | _(empty)_ | Reserved. Does not authorize or trigger candle egress today. |
+| `ROMACO_API_URL` | _(unused)_ | Reserved for a future explicitly authorized remote-adapter contract. |
 | `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + `https://romaco.io`)_ | Comma-separated exact HTTP(S) origins for `<McpBridge />` pages on other domains |
+| `ROMACO_MCP_TELEMETRY` | _(off)_ | Set exactly `jsonl` for redacted local tool telemetry on stderr. Never sends telemetry over network. |
 
 **Bridge security**: paired v2 mutually authenticates server and browser with
 HMAC-SHA-256 before chart traffic. Token never crosses WebSocket. Generate one
@@ -250,22 +251,17 @@ Set the same port in `<McpBridge port={3200} />`.
 
 ---
 
-## Free vs Pro (ROA-I)
+## Local execution and remote egress
 
-This MCP is the **free hook**. It runs fully standalone — analysis is computed
-locally and limited by whatever model your agent uses.
+Current tools compute analysis locally in `src/compression`. Setting
+`ROMACO_TOKEN` or `ROMACO_API_URL` does **not** authorize transmission of candles
+to a remote analysis service. When a token is present, `romaco_thesis` returns a
+structured `REMOTE_EGRESS_DISABLED` warning and uses the local artifact unless an
+already validated gateway artifact was injected through an authorized host path.
 
-| | Free | Pro (`ROMACO_TOKEN`) |
-|---|------|----------------------|
-| Data | `yfinance` / `raw` | same |
-| Analysis | computed locally (`src/compression`) | delegated to **ROA-I** in the backend |
-| Tools | the tools listed here | + ROA-I's exclusive backend tools (deep math, reasoning agent) |
-
-With a `ROMACO_TOKEN` set, analysis tools (starting with `romaco_analyze_market`)
-forward the heavy compute to ROA-I at `ROMACO_API_URL`. No token, or backend
-unreachable → it falls back to local compute, so the free path never breaks.
-
-A hosted key service is coming soon — today the Pro path runs against a self-hosted backend. See `.env.example`.
+A future remote adapter must add explicit authorization, validated boundary
+schemas, transport security, trace propagation, and user-facing egress docs
+before it can become callable. No automatic network fallback exists today.
 
 ---
 

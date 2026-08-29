@@ -40,6 +40,8 @@ const { version: PKG_VERSION } = createRequire(import.meta.url)('../package.json
 export interface CreateServerOptions {
   /** null explicitly disables telemetry even when environment opt-in is set. */
   telemetry?: ToolTelemetrySink | null;
+  /** Emits a local fallback warning only; never enables remote behavior. */
+  warnRemoteEgressDisabled?: boolean;
 }
 
 export function createServer(
@@ -50,6 +52,8 @@ export function createServer(
     ? undefined
     : options.telemetry ?? createConfiguredToolTelemetrySink();
   const contractOptions = { telemetry };
+  const warnRemoteEgressDisabled = options.warnRemoteEgressDisabled
+    ?? Boolean(process.env.ROMACO_TOKEN?.trim());
   const server = decorateServerWithToolCatalog(new McpServer({
     name: 'romaco',
     version: PKG_VERSION,
@@ -85,7 +89,10 @@ export function createServer(
   );
   registerLoadCandles(server, runtime.loadDataset, contractOptions);
   registerAnalyzeMarket(server);
-  registerThesis(server, runtime.resolveThesis, contractOptions);
+  registerThesis(server, runtime.resolveThesis, {
+    ...contractOptions,
+    warnRemoteEgressDisabled,
+  });
   registerThesisBatch(server);         // multi-symbol ranked analysis
   registerAnnotate(server, runtime.annotateThesis, contractOptions);
   registerDrawPattern(server, runtime.chart);

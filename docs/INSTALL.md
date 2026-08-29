@@ -130,8 +130,9 @@ All configuration is via environment variables. Set them in your MCP client's se
 | `ROMACO_MCP_ALLOWED_ORIGINS` | _(localhost + `https://romaco.io`)_ | Extra comma-separated exact HTTP(S) origins. No wildcards. |
 | `ROMACO_CACHE_DIR` | `~/.romaco/cache` | On-disk cache directory for yfinance data, with a per-timeframe TTL. |
 | `ROMACO_APP_URL` | _(empty)_ | Optional. A chart-app URL the server can auto-open when no bridge is connected. |
-| `ROMACO_TOKEN` | _(empty)_ | Empty = Free. Set it to enable Pro (delegates heavy compute to the backend). |
-| `ROMACO_API_URL` | `http://localhost:8000` | Pro backend endpoint (dev default). Point it at your self-hosted ROA-I backend — hosted tier coming soon. |
+| `ROMACO_TOKEN` | _(empty)_ | Reserved. It does not authorize or trigger candle egress today. |
+| `ROMACO_API_URL` | _(unused)_ | Reserved for a future explicitly authorized remote adapter. |
+| `ROMACO_MCP_TELEMETRY` | _(off)_ | `jsonl` enables redacted local telemetry on stderr only. |
 
 To set them, add an `env` block to your server config:
 
@@ -185,6 +186,12 @@ storage. Use in-memory input for current page lifetime.
 `required` without valid token disables chart bridge; headless tools stay
 available. Paired mode never falls back to legacy after failed handshake.
 
-## Free vs Pro
+## Local analysis and remote egress
 
-**Free** runs fully standalone: all analysis is computed locally on your machine, with no account and no token required. **Pro** is enabled by setting `ROMACO_TOKEN`, which delegates heavy compute to the backend for faster, richer results. If the token is missing or the backend is unreachable, the server automatically falls back to local compute — so the free path never breaks.
+All current analysis runs locally. Setting `ROMACO_TOKEN` or `ROMACO_API_URL`
+does not transmit candles and does not enable a Pro delegation path. A future
+remote adapter requires an explicit authorization contract and updated egress
+documentation before use.
+
+Live atomic annotations require a compatible chart host. See
+[Chart bridge compatibility](./CHART_BRIDGE_COMPATIBILITY.md).

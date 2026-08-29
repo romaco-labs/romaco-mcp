@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { ApplicationError } from '../../../../application/errors.js';
 import type { ResolveThesisArtifactUseCase } from '../../../../application/use-cases/resolveThesisArtifact.js';
 import type { AnalysisRecord } from '../../../../domain/analysis/model.js';
-import { isPro } from '../../../../gateway/client.js';
 import { registerCatalogContractTool } from '../catalogContractTool.js';
 import type { RegisterContractToolOptions, ToolWarning } from '../contracts.js';
 import { thesisDataSchema } from '../outputSchemas.js';
@@ -24,7 +23,7 @@ function serializeArtifact(artifact: AnalysisRecord, warning?: string): string {
 export function registerThesis(
   server: McpServer,
   useCase: ResolveThesisArtifactUseCase,
-  options: RegisterContractToolOptions = {},
+  options: RegisterContractToolOptions & { warnRemoteEgressDisabled?: boolean } = {},
 ): void {
   registerCatalogContractTool(
     server,
@@ -44,19 +43,12 @@ export function registerThesis(
     },
     async () => {
       try {
-        let artifact: AnalysisRecord;
-        let warning: string | undefined;
-        if (isPro()) {
-          const existing = await useCase.findExisting('gateway');
-          if (existing) {
-            artifact = existing;
-          } else {
-            artifact = await useCase.resolve();
-            warning = 'remote egress disabled; computed locally';
-          }
-        } else {
-          artifact = await useCase.resolve();
-        }
+        // Always local. Configuration alone can only request a warning; it
+        // cannot select a gateway artifact or authorize network egress.
+        const artifact: AnalysisRecord = await useCase.resolve();
+        const warning = options.warnRemoteEgressDisabled
+          ? 'remote egress disabled; computed locally'
+          : undefined;
         const warnings: ToolWarning[] = warning
           ? [{ code: 'REMOTE_EGRESS_DISABLED', message: warning }]
           : [];

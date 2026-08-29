@@ -48,7 +48,9 @@ export function registerListPanes(
         const disconnected = /no chart|not connected|wait for mcpbridge/i.test(message);
         throw new ApplicationError(
           disconnected ? 'CHART_NOT_CONNECTED' : 'ACTION_DENIED',
-          `romaco_list_panes: ${message}`,
+          disconnected
+            ? `romaco_list_panes: Chart not ready: ${message}`
+            : `romaco_list_panes: ${message}`,
           {
             retryable: disconnected,
             recovery: disconnected

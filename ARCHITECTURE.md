@@ -30,6 +30,9 @@ domain + compression       adapters/outbound
 - WASM, institutional data, ROA-I internals, and other proprietary advantages
   stay outside this repository. An approved public gateway contract may be
   consumed only through an optional outbound adapter.
+- No current tool transmits candles to the optional analysis gateway. Environment
+  variables alone never authorize remote egress; a future adapter needs an
+  explicit authorization contract and boundary validation first.
 
 Product promise: values are computed by deterministic code, interpreted by AI,
 then optionally drawn on the chart. Do not claim that interpretation has zero
