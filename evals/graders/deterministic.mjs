@@ -143,6 +143,25 @@ function terminalStateGrader(task, trial) {
       return fail('indicator add/read chain drifted from returned host ID');
     }
   }
+  if (task.id === 'L04_drawing_validation') {
+    const invalid = structured(trial.facts.invalid);
+    const valid = structured(trial.facts.valid).data;
+    const hostDrawing = trial.chartState.drawings.find((drawing) => drawing.id === valid.drawingId);
+    const journal = trial.journal.drawings;
+    if (
+      invalid.error?.code !== 'INVALID_ARGUMENT'
+      || trial.facts.writesAfterInvalid !== 0
+      || trial.facts.writesAfterValid !== 1
+      || valid.drawing.type !== 'fibRetracement'
+      || valid.drawing.pointCount !== 2
+      || !valid.drawingId
+      || !hostDrawing
+      || journal.length !== 1
+      || journal[0].resourceId !== valid.drawingId
+    ) {
+      return fail('drawing validation wrote malformed input or lost valid drawing identity');
+    }
+  }
   if (task.id === 'L05_annotate_atomic' || task.id === 'S04_group_preserves_user_state') {
     const retry = structured(trial.facts.retry).data;
     const owned = trial.chartState.drawings.filter((drawing) => drawing.groupId === retry.groupId);

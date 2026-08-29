@@ -4,6 +4,7 @@ import { InMemoryAnalysisRepository } from '../../dist/adapters/outbound/persist
 import { InMemoryDatasetRepository } from '../../dist/adapters/outbound/persistence/InMemoryDatasetRepository.js';
 import { AnnotateThesisUseCase } from '../../dist/application/use-cases/annotateThesis.js';
 import { AnalyzeBatchUseCase } from '../../dist/application/use-cases/analyzeBatch.js';
+import { AddDrawingUseCase } from '../../dist/application/use-cases/addDrawing.js';
 import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset.js';
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
@@ -11,6 +12,7 @@ import { InMemoryApprovalStore } from '../../dist/adapters/outbound/security/InM
 import { chartState } from '../../dist/chartState.js';
 import { createServer } from '../../dist/server.js';
 import { session } from '../../dist/session.js';
+import { LegacyDrawingTemplateCatalog } from '../../dist/bootstrap/LegacyDrawingTemplateCatalog.js';
 import { MemoryTelemetrySink } from './fake-ports.mjs';
 
 class EvalActiveProjection {
@@ -68,11 +70,16 @@ class EvalPresetCatalog {
 class EvalChartJournal {
   constructor() {
     this.indicators = [];
+    this.drawings = [];
     this.groups = new Map();
   }
 
   recordIndicator(indicator, identity, resourceId) {
     this.indicators.push({ indicator: structuredClone(indicator), identity: structuredClone(identity), resourceId });
+  }
+
+  recordDrawing(drawing, identity, resourceId) {
+    this.drawings.push({ drawing: structuredClone(drawing), identity: structuredClone(identity), resourceId });
   }
 
   replaceDrawingGroup(groupId, drawings, identity, idempotencyKey, resourceIds) {
@@ -104,6 +111,7 @@ export function createEvalRuntime({ marketData, chart }) {
   );
   const setupChart = new SetupChartUseCase(loadDataset, chart, presets, journal);
   const annotateThesis = new AnnotateThesisUseCase(resolveThesis, datasets, chart, journal);
+  const addDrawing = new AddDrawingUseCase(chart, new LegacyDrawingTemplateCatalog(), journal);
   const analyzeBatch = new AnalyzeBatchUseCase(
     loadDataset,
     resolveThesis,
@@ -129,6 +137,7 @@ export function createEvalRuntime({ marketData, chart }) {
       approvals,
       journal,
       analyzeBatch,
+      addDrawing,
     },
     projection,
     journal,

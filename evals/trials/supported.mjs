@@ -106,6 +106,7 @@ async function runWithHarness({ chart, execute, marketFixtures = new Map() }) {
       chartCalls: structuredClone(chart.calls),
       journal: {
         indicators: structuredClone(built.journal.indicators),
+        drawings: structuredClone(built.journal.drawings),
         groups: Object.fromEntries(built.journal.groups),
       },
       evidenceNumbers: facts.evidenceNumbers ?? [],
@@ -300,6 +301,35 @@ async function l03() {
       const indicatorId = structured(added).data.indicator.indicatorId;
       const values = await harness.callTool('romaco_get_indicator_values', { indicatorId });
       return { added, values, indicatorId };
+    },
+  });
+}
+
+async function l04() {
+  const candles = realCandles('AAPL').slice(-120);
+  const first = candles[0];
+  const last = candles.at(-1);
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness, chart }) => {
+      const invalid = await harness.callTool('romaco_add_drawing', {
+        drawingType: 'fibRetracement',
+        points: [{ timestamp: first.timestamp * 1_000, price: first.low }],
+      });
+      const writesAfterInvalid = chart.calls.filter(
+        (call) => call.operation === 'execute' && call.command.action === 'addDrawing',
+      ).length;
+      const valid = await harness.callTool('romaco_add_drawing', {
+        drawingType: 'fibRetracement',
+        points: [
+          { timestamp: first.timestamp * 1_000, price: first.low },
+          { timestamp: last.timestamp * 1_000, price: last.high },
+        ],
+      });
+      const writesAfterValid = chart.calls.filter(
+        (call) => call.operation === 'execute' && call.command.action === 'addDrawing',
+      ).length;
+      return { invalid, valid, writesAfterInvalid, writesAfterValid };
     },
   });
 }
@@ -554,6 +584,7 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['live-setup-identity', l01],
   ['context-cost-gate', l02],
   ['indicator-id-chain', l03],
+  ['drawing-validation', l04],
   ['annotate-atomic-idempotent', l05],
   ['group-preserves-user-state', s04],
   ['cross-symbol-hard-stop', l06],
