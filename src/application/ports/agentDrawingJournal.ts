@@ -10,4 +10,3 @@ export interface AgentDrawingJournalPort {
   listAgentDrawingGroups(identity: ChartIdentity): readonly AgentDrawingGroupSummary[];
   removeAgentDrawingGroup(groupId: string, identity: ChartIdentity): void;
 }
-

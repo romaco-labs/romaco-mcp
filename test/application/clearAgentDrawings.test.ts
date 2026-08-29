@@ -85,4 +85,3 @@ describe('ClearAgentDrawingsUseCase', () => {
     expect(context.groups.has('romaco-mcp/thesis')).toBe(true);
   });
 });
-

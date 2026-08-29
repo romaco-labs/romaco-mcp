@@ -44,4 +44,3 @@ export class LegacyAgentDrawingJournal implements AgentDrawingJournalPort {
     if (existing) chartState.removeDrawingsByGroup(groupId);
   }
 }
-
