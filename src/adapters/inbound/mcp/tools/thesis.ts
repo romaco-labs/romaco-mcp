@@ -37,15 +37,20 @@ export function registerThesis(
         'Call romaco_load_candles or romaco_setup_chart first. Returns <2 KB. ' +
         'Local analysis returns a stable analysisId used by romaco_annotate. ' +
         'Remote candle egress is disabled without a future explicit authorization contract. ' +
+        'Pass analysisId to retrieve one exact stored artifact without reading or changing active state. ' +
         'After stating the verdict, offer to draw it and ask first; do not call romaco_annotate automatically.',
-      inputSchema: z.object({}),
+      inputSchema: z.object({
+        analysisId: z.string().min(1).optional().describe(
+          'Exact stored analysisId. Omit only for the current active dataset.',
+        ),
+      }),
       dataSchema: thesisDataSchema,
     },
-    async () => {
+    async ({ analysisId }) => {
       try {
         // Always local. Configuration alone can only request a warning; it
         // cannot select a gateway artifact or authorize network egress.
-        const artifact: AnalysisRecord = await useCase.resolve();
+        const artifact: AnalysisRecord = await useCase.resolve(analysisId);
         const warning = options.warnRemoteEgressDisabled
           ? 'remote egress disabled; computed locally'
           : undefined;
@@ -70,14 +75,17 @@ export function registerThesis(
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const missingSession = /no candle data loaded/i.test(message);
+        const missingSession = !analysisId && /no candle data loaded/i.test(message);
         throw new ApplicationError(
           missingSession ? 'SESSION_NOT_LOADED' : 'ANALYSIS_NOT_FOUND',
           message,
           {
             recovery: missingSession
               ? { action: 'load_dataset', instruction: 'Call romaco_load_candles or romaco_setup_chart first.' }
-              : { action: 'select_analysis', instruction: 'Load the matching dataset and request a current thesis.' },
+              : {
+                  action: 'select_analysis',
+                  instruction: 'Use an analysisId returned by romaco_setup_chart or request a current thesis.',
+                },
             cause: error,
           },
         );

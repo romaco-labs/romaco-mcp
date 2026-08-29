@@ -121,6 +121,29 @@ describe('hex-migrated MCP output contracts', () => {
     });
   });
 
+  it('retrieves an exact prior thesis by public analysisId without changing current state', async () => {
+    await harness.callTool('romaco_load_candles', {
+      source: 'raw', symbol: 'AAPL', timeframe: '1h', rawCandles: rawCandles(120),
+    });
+    const a = await harness.callTool('romaco_thesis');
+    const aData = (a.raw.structuredContent as any).data;
+    await harness.callTool('romaco_load_candles', {
+      source: 'raw', symbol: 'TSLA', timeframe: '1h', rawCandles: rawCandles(120),
+    });
+    const b = await harness.callTool('romaco_thesis');
+    const bData = (b.raw.structuredContent as any).data;
+
+    const exactA = await harness.callTool('romaco_thesis', { analysisId: aData.analysisId });
+    expect(exactA.raw.structuredContent).toMatchObject({
+      status: 'ok',
+      data: { analysisId: aData.analysisId, datasetId: aData.datasetId },
+    });
+    const currentB = await harness.callTool('romaco_thesis');
+    expect(currentB.raw.structuredContent).toMatchObject({
+      data: { analysisId: bData.analysisId, datasetId: bData.datasetId },
+    });
+  });
+
   it('returns setup identity, provider, live status, and resource ids', async () => {
     const response = await harness.callTool('romaco_setup_chart', {
       symbol: 'TEST',

@@ -255,22 +255,26 @@ async function s05() {
         symbol: 'TSLA', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: tsla,
       });
       const b = structured(setupB).data;
+      // Establish B as current through public MCP before exact A retrieval.
+      const activeB = await harness.callTool('romaco_thesis');
       const activeDatasetBefore = await runtime.datasets.getActive();
       const activeAnalysisBefore = await runtime.analyses.getActive();
 
-      // Exercise real correlation-safe use case, not a fake projection. Explicit
-      // artifact resolution must neither depend on nor mutate active B state.
-      const explicitA = await runtime.resolveThesis.resolve(a.analysisId);
+      // Exercise public MCP correlation. Explicit artifact retrieval must neither
+      // depend on nor mutate active B state.
+      const explicitAResult = await harness.callTool('romaco_thesis', { analysisId: a.analysisId });
+      const explicitA = structured(explicitAResult).data;
 
       const activeDatasetAfter = await runtime.datasets.getActive();
       const activeAnalysisAfter = await runtime.analyses.getActive();
       return {
         setupA,
         setupB,
+        activeB,
+        explicitAResult,
         explicitA: {
           analysisId: explicitA.analysisId,
           datasetId: explicitA.datasetId,
-          lastPrice: explicitA.summary.meta.last_price,
         },
         a: { analysisId: a.analysisId, datasetId: a.dataset.datasetId },
         b: { analysisId: b.analysisId, datasetId: b.dataset.datasetId },
@@ -282,7 +286,7 @@ async function s05() {
           analysisId: activeAnalysisAfter?.analysisId,
           datasetId: activeDatasetAfter?.datasetId,
         },
-        claims: [explicitA.summary.meta.last_price],
+        claims: [],
       };
     },
   });
