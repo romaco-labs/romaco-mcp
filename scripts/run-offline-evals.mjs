@@ -18,6 +18,7 @@ try {
     executed: report.executed,
     passed: report.passed,
     failed: report.failed,
+    harnessErrors: report.harnessErrors,
     planned: report.planned,
     taskSuccessRate: report.taskSuccessRate,
     successNumerator: report.passed,
@@ -33,8 +34,12 @@ try {
       executed: report.executed,
       passed: report.passed,
       failed: report.failed,
+      harnessErrors: report.harnessErrors,
       planned: report.planned,
-      taskSuccessRate: null,
+      taskSuccessRate: report.taskSuccessRate,
+      successNumerator: report.passed,
+      successDenominator: report.executed,
+      note: 'Success rate covers runnable tasks only; planned tasks are excluded and reported separately.',
       error: error.message,
     }, null, 2)}\n`);
   } else {

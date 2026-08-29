@@ -10,22 +10,40 @@ import {
 } from '../../evals/harness/fake-ports.mjs';
 
 describe('offline eval harness foundation', () => {
-  it('reports planned work without inventing a task success rate', async () => {
-    const report = await new OfflineEvalRunner().run();
-    expect(report).toMatchObject({
-      manifestValid: true,
-      selectedTasks: 28,
-      executed: 0,
-      planned: 28,
-      taskSuccessRate: null,
+  it('fails closed when a runnable workflow or grader implementation disappears', async () => {
+    await expect(new OfflineEvalRunner().run()).rejects.toMatchObject({
+      report: {
+        manifestValid: true,
+        selectedTasks: 28,
+        executed: 0,
+        failed: 0,
+        harnessErrors: 11,
+        planned: 17,
+        taskSuccessRate: null,
+      },
     });
-    expect(report.results.every((result) => result.status === 'planned')).toBe(true);
   });
 
   it('can require full runnable coverage and fail honestly', async () => {
-    await expect(new OfflineEvalRunner().run({ requireAll: true })).rejects.toThrow(
-      /28 eval task\(s\) are still planned/,
+    await expect(new OfflineEvalRunner({
+      trials: SUPPORTED_OFFLINE_TRIALS,
+      graders: DETERMINISTIC_GRADERS,
+    }).run({ requireAll: true })).rejects.toThrow(
+      /0 runnable eval task\(s\) failed; 0 harness error\(s\); 17 task\(s\) remain planned/,
     );
+  });
+
+  it('fails the run when any executed runnable grader fails', async () => {
+    const graders = new Map(DETERMINISTIC_GRADERS);
+    graders.set('budget', () => ({ passed: false, message: 'forced failure' }));
+    await expect(new OfflineEvalRunner({
+      trials: SUPPORTED_OFFLINE_TRIALS,
+      graders,
+    }).run()).rejects.toMatchObject({
+      report: {
+        executed: 11, passed: 0, failed: 11, harnessErrors: 0, planned: 17, taskSuccessRate: 0,
+      },
+    });
   });
 
   it('executes and grades only honestly runnable tasks', async () => {

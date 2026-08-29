@@ -22,15 +22,20 @@ export class OfflineEvalRunner {
         (id) => manifest.graders.find((grader) => grader.id === id)?.status === 'runnable'
           && this.graders.has(id),
       );
-      if (task.status !== 'runnable' || !trial || !gradersReady) {
+      if (task.status !== 'runnable') {
         results.push({
           taskId: task.id,
           status: 'planned',
-          reason: task.status !== 'runnable'
-            ? 'task-not-runnable'
-            : !trial
-              ? 'workflow-not-implemented'
-              : 'graders-not-runnable',
+          reason: 'task-not-runnable',
+        });
+        continue;
+      }
+      if (!trial || !gradersReady) {
+        results.push({
+          taskId: task.id,
+          status: 'harness_error',
+          reason: !trial ? 'workflow-not-implemented' : 'graders-not-runnable',
+          grades: [],
         });
         continue;
       }
@@ -55,14 +60,16 @@ export class OfflineEvalRunner {
       executed: results.filter((result) => result.status === 'passed' || result.status === 'failed').length,
       passed: results.filter((result) => result.status === 'passed').length,
       failed: results.filter((result) => result.status === 'failed').length,
+      harnessErrors: results.filter((result) => result.status === 'harness_error').length,
       planned: results.filter((result) => result.status === 'planned').length,
       results,
     };
     report.taskSuccessRate = report.executed > 0 ? report.passed / report.executed : null;
 
-    if (requireAll && (report.planned > 0 || report.failed > 0)) {
+    if (report.failed > 0 || report.harnessErrors > 0 || (requireAll && report.planned > 0)) {
       const error = new Error(
-        `${report.planned} eval task(s) are still planned; ${report.failed} runnable task(s) failed.`,
+        `${report.failed} runnable eval task(s) failed; ${report.harnessErrors} harness error(s); ` +
+        `${report.planned} task(s) remain planned.`,
       );
       error.report = report;
       throw error;
