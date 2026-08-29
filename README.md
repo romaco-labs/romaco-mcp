@@ -256,8 +256,14 @@ in-memory input for current page lifetime. `auto` selects paired v2 with valid
 token; no token keeps legacy v1 with warning. Malformed configured token
 disables only chart bridge. `required` never falls back to v1.
 
-Listener binds `127.0.0.1`; exact origins add defense in depth. Localhost pages
-still need pairing token. Frames are not encrypted. Never expose listener
+Legacy compatibility is unauthenticated and is not secure by default. Production
+deployments should use `required` plus paired `McpBridge`; enable legacy only as
+an explicit migration step.
+
+Listener binds `127.0.0.1`; exact origins add defense in depth. In paired mode,
+localhost pages still need pairing token. Browser-to-server frames above 8 MiB
+are rejected before JSON parsing, leaving more than 10x headroom over typical
+documented chart snapshots. Frames are not encrypted. Never expose listener
 remotely; use authenticated TLS gateway for non-loopback deployments.
 
 ```bash

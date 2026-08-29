@@ -192,6 +192,9 @@ storage. Use in-memory input for current page lifetime.
 `auto` without token preserves legacy compatibility and logs warning.
 `required` without valid token disables chart bridge; headless tools stay
 available. Paired mode never falls back to legacy after failed handshake.
+Legacy compatibility is unauthenticated and is not secure by default; use
+`required` plus paired `McpBridge` in production. Browser-to-server frames are
+capped at 8 MiB, safely above typical chart snapshot responses.
 
 ## Local analysis and remote egress
 

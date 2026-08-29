@@ -59,12 +59,22 @@ clientProof: eSSyrGqO2-rl81b0t3lTw_clLjDM0roVvOuGZOZHH4A
 No chart socket adopts before authenticated `ready`. Responses resolve only
 requests owned by same socket.
 
+## Payload bound
+
+Browser-to-server WebSocket frames are capped at 8 MiB and rejected before JSON
+parsing when larger. This leaves more than 10x headroom over typical documented
+chart snapshots while bounding unauthenticated memory and parsing work. Remote
+gateways should enforce same or smaller limit.
+
 ## Compatibility
 
 `ROMACO_MCP_BRIDGE_AUTH=auto` chooses v2 with valid token. No token chooses
 legacy v1 and logs warning. Configured malformed token fails closed. `required`
 disables chart adapter when config missing/invalid; headless MCP remains.
 `legacy` is explicit.
+
+Legacy mode is unauthenticated and is not secure by default. Production use
+requires `required` mode plus paired browser configuration.
 
 Server never accepts v1 and v2 on same listener, blocking downgrade after
 failed v2 handshake.
