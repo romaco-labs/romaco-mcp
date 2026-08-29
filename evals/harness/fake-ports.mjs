@@ -71,7 +71,7 @@ export class FakeChartPort {
     drawings = [],
     indicators = [],
     alerts = [],
-    snapshotDataUrl = 'data:image/png;base64,iVBORw0KGgo=',
+    snapshotDataUrl = null,
     fault = null,
     rawContext = {},
   }) {
@@ -252,7 +252,10 @@ export class FakeChartPort {
   async captureSnapshot(format) {
     this.calls.push({ operation: 'captureSnapshot', format });
     if (!this.connected) throw new Error('CHART_NOT_CONNECTED');
-    return { format, dataUrl: this.snapshotDataUrl.replace('image/png', `image/${format}`) };
+    const defaultDataUrl = format === 'jpeg'
+      ? 'data:image/jpeg;base64,/9j/2Q=='
+      : 'data:image/png;base64,iVBORw0KGgo=';
+    return { format, dataUrl: this.snapshotDataUrl ?? defaultDataUrl };
   }
 
   state() {
