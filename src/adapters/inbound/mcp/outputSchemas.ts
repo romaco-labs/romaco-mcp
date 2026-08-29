@@ -266,6 +266,26 @@ export const indicatorValuesDataSchema = z.object({
   values: z.record(z.unknown()),
 }).strict();
 
+const liveChartIdentitySchema = z.object({
+  chartId: z.string().min(1),
+  symbol: z.string().min(1).optional(),
+  timeframe: timeframeSchema.optional(),
+  datasetId: z.string().min(1).optional(),
+}).strict();
+
+export const addDrawingDataSchema = z.object({
+  drawingId: z.string().min(1).nullable(),
+  applied: z.literal(true),
+  drawing: z.object({
+    id: z.string().min(1).nullable(),
+    type: z.string().min(1),
+    pointCount: z.number().int().positive(),
+    paneId: z.string().min(1).optional(),
+    groupId: z.string().min(1).optional(),
+  }).strict(),
+  identity: liveChartIdentitySchema,
+}).strict();
+
 export const annotateDataSchema = z.object({
   analysisId: z.string().min(1),
   datasetId: z.string().min(1),

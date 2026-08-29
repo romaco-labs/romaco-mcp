@@ -56,9 +56,9 @@ describe('27-tool contract catalog', () => {
     }
   });
 
-  it('advertises output contracts only for the eleven actually structured tools', async () => {
+  it('advertises output contracts only for the twelve actually structured tools', async () => {
     const advertised = await client.listTools();
-    expect(advertised.tools.filter((tool) => tool.outputSchema)).toHaveLength(11);
+    expect(advertised.tools.filter((tool) => tool.outputSchema)).toHaveLength(12);
     for (const tool of advertised.tools) {
       const entry = ROMACO_TOOL_CATALOG_BY_NAME.get(tool.name as never);
       expect(entry).toBeTruthy();

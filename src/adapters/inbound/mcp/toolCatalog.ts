@@ -95,7 +95,7 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.add-drawing.v1',
       summary: 'Applied drawing and host-assigned identity.',
-      dataFields: ['drawing', 'applied', 'idempotencyKey'],
+      dataFields: ['drawingId', 'drawing', 'applied', 'identity'],
       identityFields: ['chartId', 'datasetId'],
       contentKinds: TEXT,
     },

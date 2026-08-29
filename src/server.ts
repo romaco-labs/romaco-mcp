@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { registerGetChartContext } from './tools/get_chart_context.js';
 import { registerGetVisibleCandles } from './tools/get_visible_candles.js';
 import { registerAddIndicator } from './tools/add_indicator.js';
-import { registerAddDrawing } from './tools/add_drawing.js';
+import { registerAddDrawing } from './adapters/inbound/mcp/tools/addDrawing.js';
 import { registerSetZoom } from './tools/set_zoom.js';
 import { registerAddAlert } from './tools/add_alert.js';
 import { registerRemoveAlert } from './tools/remove_alert.js';
@@ -63,7 +63,7 @@ export function createServer(
   registerGetChartContext(server, runtime.chart, contractOptions);
   registerGetVisibleCandles(server);
   registerAddIndicator(server, runtime.chart, runtime.journal, contractOptions);
-  registerAddDrawing(server);
+  registerAddDrawing(server, runtime.addDrawing, contractOptions);
   registerSetZoom(server);       // also registers romaco_reset_view
   registerAddAlert(server);
   registerRemoveAlert(server);

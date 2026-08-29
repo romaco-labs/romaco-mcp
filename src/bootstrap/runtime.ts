@@ -14,6 +14,8 @@ import { AnnotateThesisUseCase } from '../application/use-cases/annotateThesis.j
 import type { ApprovalPort } from '../application/ports/approval.js';
 import { InMemoryApprovalStore } from '../adapters/outbound/security/InMemoryApprovalStore.js';
 import type { ChartJournalPort } from '../application/ports/chartJournal.js';
+import { AddDrawingUseCase } from '../application/use-cases/addDrawing.js';
+import { LegacyDrawingTemplateCatalog } from './LegacyDrawingTemplateCatalog.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -24,6 +26,7 @@ export interface ApplicationRuntime {
   presetNames: readonly string[];
   resolveThesis: ResolveThesisArtifactUseCase;
   annotateThesis: AnnotateThesisUseCase;
+  addDrawing: AddDrawingUseCase;
   approvals: ApprovalPort;
   journal: ChartJournalPort;
 }
@@ -40,6 +43,7 @@ export function createProductionRuntime(): ApplicationRuntime {
     new LegacySessionProjection(),
   );
   const journal = new LegacyChartJournal();
+  const drawingTemplates = new LegacyDrawingTemplateCatalog();
   const resolveThesis = new ResolveThesisArtifactUseCase(
     datasets,
     analyses,
@@ -56,6 +60,7 @@ export function createProductionRuntime(): ApplicationRuntime {
     resolveThesis,
     approvals,
     journal,
+    addDrawing: new AddDrawingUseCase(chart, drawingTemplates, journal),
     annotateThesis: new AnnotateThesisUseCase(
       resolveThesis,
       datasets,
