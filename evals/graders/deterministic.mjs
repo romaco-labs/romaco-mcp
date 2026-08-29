@@ -84,6 +84,18 @@ function identityGrader(task, trial) {
       return fail('explicit A resolution drifted or mutated active B identity');
     }
   }
+  if (task.id === 'L07_pattern_replace') {
+    const replacements = trial.chartCalls.filter((call) => call.operation === 'replaceDrawingGroup');
+    const invalid = replacements.find((call) =>
+      call.operation === 'replaceDrawingGroup'
+      && (
+        call.command.expectedIdentity?.chartId !== 'chart_aapl'
+        || call.command.expectedIdentity?.symbol !== 'AAPL'
+        || call.command.expectedIdentity?.timeframe !== '1h'
+      )
+    );
+    if (invalid || replacements.length !== 2) return fail('pattern replacement lost exact chart identity');
+  }
   return pass('identity references remain correlated');
 }
 
@@ -128,6 +140,40 @@ function terminalStateGrader(task, trial) {
     const owned = trial.chartState.drawings.filter((drawing) => drawing.groupId === approved.groupId);
     if (owned.length !== approved.drawingCount) {
       return fail('approved annotation terminal state does not match structured result');
+    }
+  }
+  if (task.id === 'L07_pattern_replace') {
+    const owned = trial.chartState.drawings.filter(
+      (drawing) => drawing.groupId === trial.facts.expectedGroupId,
+    );
+    const user = trial.chartState.drawings.find(
+      (drawing) => drawing.id === trial.facts.userDrawingId,
+    );
+    if (!user || owned.length === 0) {
+      return fail('pattern replacement removed user state or produced no owned geometry');
+    }
+    const groupIds = new Set(owned.map((drawing) => drawing.groupId));
+    if (groupIds.size !== 1) return fail('pattern geometry escaped its owned family group');
+  }
+  if (task.id === 'D02_atomic_disconnect') {
+    const failed = structured(trial.facts.failed);
+    const recovered = structured(trial.facts.recovered).data;
+    const partialOwned = trial.facts.stateAfterFailure.drawings.filter(
+      (drawing) => drawing.groupId === 'romaco-mcp/thesis',
+    );
+    const finalOwned = trial.chartState.drawings.filter(
+      (drawing) => drawing.groupId === recovered.groupId,
+    );
+    const journal = trial.journal.groups[recovered.groupId];
+    if (
+      failed.error?.code !== 'CHART_NOT_CONNECTED'
+      || partialOwned.length !== 0
+      || Object.keys(trial.facts.journalAfterFailure).length !== 0
+      || finalOwned.length !== recovered.drawingCount
+      || journal?.drawings?.length !== recovered.drawingCount
+      || JSON.stringify(journal?.resourceIds) !== JSON.stringify(recovered.drawingIds)
+    ) {
+      return fail('disconnect left partial state, false journal state, or duplicate recovery state');
     }
   }
   return pass('terminal fake-port state matches outcome');
@@ -190,6 +236,22 @@ function safetyGrader(task, trial) {
       && facts.afterReplay === facts.afterApproved
       ? pass('approval is required, scoped, and single-use')
       : fail('approval challenge, apply, or replay invariant failed');
+  }
+  if (task.id === 'L07_pattern_replace') {
+    return trial.chartState.drawings.some((drawing) => drawing.id === trial.facts.userDrawingId)
+      ? pass('owned pattern replacement preserves user drawing')
+      : fail('owned pattern replacement removed user drawing');
+  }
+  if (task.id === 'D02_atomic_disconnect') {
+    const userAfterFailure = trial.facts.stateAfterFailure.drawings.some(
+      (drawing) => drawing.id === trial.facts.userDrawingId,
+    );
+    const userFinal = trial.chartState.drawings.some(
+      (drawing) => drawing.id === trial.facts.userDrawingId,
+    );
+    return userAfterFailure && userFinal
+      ? pass('disconnect and retry preserve user-owned drawing')
+      : fail('disconnect recovery removed user-owned drawing');
   }
   return pass('no unsafe write observed');
 }

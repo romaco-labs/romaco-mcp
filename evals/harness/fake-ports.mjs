@@ -198,7 +198,10 @@ export class FakeChartPort {
       return copy(prior.result);
     }
     if (this.fault?.operation === 'replaceDrawingGroup') {
-      return { success: false, error: this.fault.errorCode ?? 'BRIDGE_DISCONNECTED' };
+      // ChartPort adapters reject failed host actions. Throw here too: returning
+      // `success:false` would let application code journal a write that never
+      // committed and would not match production BridgeChartAdapter behavior.
+      throw new Error(this.fault.errorCode ?? 'Browser disconnected');
     }
 
     const retained = this.drawings.filter((item) => item.groupId !== command.groupId);

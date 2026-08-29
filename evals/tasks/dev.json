@@ -147,10 +147,10 @@
     "id": "L07_pattern_replace",
     "split": "dev",
     "category": "live",
-    "status": "planned",
+    "status": "runnable",
     "prompt": "Draw the strongest detected AAPL pattern twice after approval. Preserve user drawings and avoid duplicate Romaco geometry.",
     "oracleWorkflow": "pattern-group-replace",
-    "fixtureRefs": ["real-aapl", "chart-user-drawings", "approval-state"],
+    "fixtureRefs": ["head-shoulders-market", "chart-user-drawings", "approval-state"],
     "graderRefs": ["identity", "terminal-state", "safety", "budget"],
     "expectedOutcomes": ["pattern family has one current group", "user drawing remains", "rerun is idempotent"],
     "budget": { "maxToolCalls": 5, "maxResultBytes": 12000, "maxDurationMs": 3500 }

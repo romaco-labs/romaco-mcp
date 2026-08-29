@@ -1,0 +1,8 @@
+{
+  "kind": "synthetic-candles",
+  "generator": "head-shoulders",
+  "symbol": "AAPL",
+  "timeframe": "1h",
+  "bars": 34,
+  "expectedPattern": "head_shoulders"
+}

@@ -24,6 +24,23 @@ function flatCandles(count = 120) {
   });
 }
 
+function headShouldersCandles() {
+  const prices = [
+    100, 102, 105, 110, 115, 113, 110, 107, 105,
+    100, 95, 100, 105, 110, 115, 120, 125, 128, 130,
+    125, 120, 115, 110, 105,
+    108, 112, 115, 113, 110, 107, 105, 100, 95, 90,
+  ];
+  return prices.map((price, index) => ({
+    timestamp: 1_700_000_000 + index * 3_600,
+    open: price,
+    high: price + 0.5,
+    low: price - 0.5,
+    close: price,
+    volume: 1_000,
+  }));
+}
+
 function disconnectedChart(symbol = 'AAPL', timeframe = '1d') {
   return new FakeChartPort({
     identity: { chartId: `chart_${symbol.toLowerCase()}`, symbol, timeframe },
@@ -86,6 +103,7 @@ async function runWithHarness({ chart, execute }) {
       calls: harness.calls,
       telemetry: harness.telemetry.events,
       chartState: chart.state(),
+      chartCalls: structuredClone(chart.calls),
       journal: {
         indicators: structuredClone(built.journal.indicators),
         groups: Object.fromEntries(built.journal.groups),
@@ -297,6 +315,28 @@ async function l06() {
   });
 }
 
+async function l07() {
+  const candles = headShouldersCandles();
+  const userDrawing = { id: 'user_1', owner: 'user', groupId: null, type: 'trendline' };
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1h', candles, { drawings: [userDrawing] }),
+    execute: async ({ harness }) => {
+      const setup = await harness.callTool('romaco_setup_chart', {
+        symbol: 'AAPL', preset: 'clean', timeframe: '1h', source: 'raw', rawCandles: candles,
+      });
+      const first = await harness.callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
+      const second = await harness.callTool('romaco_draw_pattern', { kind: 'head_shoulders' });
+      return {
+        setup,
+        first,
+        second,
+        expectedGroupId: 'romaco-mcp/pattern/hs',
+        userDrawingId: userDrawing.id,
+      };
+    },
+  });
+}
+
 async function a01() {
   const candles = realCandles('AAPL');
   return runWithHarness({
@@ -384,6 +424,41 @@ async function s05() {
   });
 }
 
+async function d02() {
+  const candles = realCandles('AAPL');
+  const userDrawing = { id: 'user_1', owner: 'user', groupId: null, type: 'trendline' };
+  const chart = connectedChart('AAPL', '1d', candles, {
+    drawings: [userDrawing],
+    fault: { operation: 'replaceDrawingGroup', errorCode: 'Browser disconnected' },
+  });
+  return runWithHarness({
+    chart,
+    execute: async ({ harness, journal }) => {
+      const setup = await harness.callTool('romaco_setup_chart', {
+        symbol: 'AAPL', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: candles,
+      });
+      const analysisId = structured(setup).data.analysisId;
+      const failedApproval = await approvedAnnotate(harness, analysisId);
+      const stateAfterFailure = chart.state();
+      const journalAfterFailure = Object.fromEntries(journal.groups);
+
+      chart.fault = null;
+      chart.connected = true;
+      const recoveredApproval = await approvedAnnotate(harness, analysisId);
+      return {
+        setup,
+        failedChallenge: failedApproval.challenge,
+        failed: failedApproval.applied,
+        recoveredChallenge: recoveredApproval.challenge,
+        recovered: recoveredApproval.applied,
+        stateAfterFailure,
+        journalAfterFailure,
+        userDrawingId: userDrawing.id,
+      };
+    },
+  });
+}
+
 export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['raw-load-analyze', h01],
   ['headless-setup', h02],
@@ -395,6 +470,8 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['annotate-atomic-idempotent', l05],
   ['group-preserves-user-state', s04],
   ['cross-symbol-hard-stop', l06],
+  ['pattern-group-replace', l07],
   ['explicit-dataset-race', s05],
   ['annotate-approval', a01],
+  ['atomic-disconnect-recovery', d02],
 ]);

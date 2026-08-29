@@ -7,7 +7,9 @@ import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
 import { InMemoryApprovalStore } from '../../dist/adapters/outbound/security/InMemoryApprovalStore.js';
+import { chartState } from '../../dist/chartState.js';
 import { createServer } from '../../dist/server.js';
+import { session } from '../../dist/session.js';
 import { MemoryTelemetrySink } from './fake-ports.mjs';
 
 class EvalActiveProjection {
@@ -17,6 +19,16 @@ class EvalActiveProjection {
 
   replace(dataset) {
     this.active = structuredClone(dataset);
+    // Production uses LegacySessionProjection while legacy analysis/drawing
+    // tools finish their port migration. Mirror that public runtime boundary so
+    // offline trials exercise the same MCP-visible state, not a private shortcut.
+    session.setLastLoad({
+      source: dataset.source,
+      symbol: dataset.symbol,
+      timeframe: dataset.timeframe,
+      candles: structuredClone(dataset.candles),
+      fetched_at: dataset.fetchedAt,
+    });
   }
 }
 
@@ -73,6 +85,8 @@ class EvalChartJournal {
 }
 
 export function createEvalRuntime({ marketData, chart }) {
+  session.clear();
+  chartState.clear();
   let datasetCounter = 0;
   let analysisCounter = 0;
   const datasets = new InMemoryDatasetRepository(() => `eval_${++datasetCounter}`);

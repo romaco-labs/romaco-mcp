@@ -87,7 +87,7 @@
     "id": "D02_atomic_disconnect",
     "split": "heldout",
     "category": "degraded",
-    "status": "planned",
+    "status": "runnable",
     "prompt": "Replace a Romaco drawing group while the bridge disconnects mid-operation, then reconnect and converge without duplicates or half-applied state.",
     "oracleWorkflow": "atomic-disconnect-recovery",
     "fixtureRefs": ["chart-user-drawings", "bridge-disconnect"],

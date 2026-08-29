@@ -45,7 +45,7 @@ function mapAnnotateError(error: unknown): ApplicationError {
       cause: error,
     });
   }
-  if (/no chart|not connected|wait for mcpbridge/i.test(message)) {
+  if (/no chart|not connected|disconnected|wait for mcpbridge/i.test(message)) {
     return new ApplicationError('CHART_NOT_CONNECTED', message, {
       retryable: true,
       recovery: { action: 'connect_chart', instruction: 'Connect a chart with McpBridge and retry.' },

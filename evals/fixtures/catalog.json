@@ -3,6 +3,7 @@
   { "id": "real-tsla", "file": "test/fixtures/real/TSLA_1d_400.json" },
   { "id": "real-spy", "file": "test/fixtures/real/SPY_1d_400.json" },
   { "id": "flat-market", "file": "evals/fixtures/scenarios/flat-market.json" },
+  { "id": "head-shoulders-market", "file": "evals/fixtures/scenarios/head-shoulders.json" },
   { "id": "directional-market", "file": "evals/fixtures/scenarios/directional-market.json" },
   { "id": "batch-partial", "file": "evals/fixtures/scenarios/batch-partial.json" },
   { "id": "chart-aapl", "file": "evals/fixtures/scenarios/chart-aapl.json" },
