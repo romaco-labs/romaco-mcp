@@ -2,7 +2,7 @@ import { analyzeSession } from '../../compression/analyze.js';
 import type { TradeThesis } from '../../compression/thesis.js';
 import { createAnalysisId, type AnalysisProvider, type AnalysisRecord } from '../../domain/analysis/model.js';
 import { validateTradeThesis } from '../../domain/analysis/validateTradeThesis.js';
-import { normalizeSymbol, type DatasetRecord } from '../../domain/dataset/model.js';
+import { createDatasetId, normalizeSymbol, type DatasetRecord } from '../../domain/dataset/model.js';
 import type { ActiveDatasetSource } from '../ports/activeDatasetSource.js';
 import type { AnalysisRepository } from '../ports/analysisRepository.js';
 import type { DatasetRepository } from '../ports/datasetRepository.js';
@@ -34,7 +34,17 @@ export class ResolveThesisArtifactUseCase {
       return latest;
     }
     const analysis = analyzeSession([...dataset.candles]);
-    return this.save(dataset, 'local', analysis.thesis);
+    return this.save(dataset, 'local', analysis.thesis, true);
+  }
+
+  /** Resolve one exact dataset without reading or mutating process-global active state. */
+  async resolveForDataset(datasetId: string): Promise<AnalysisRecord> {
+    const dataset = await this.datasets.get(createDatasetId(datasetId));
+    if (!dataset) throw new Error(`Dataset ${datasetId} not found.`);
+    const latest = await this.analyses.latestFor(dataset.datasetId);
+    if (latest) return latest;
+    const analysis = analyzeSession([...dataset.candles]);
+    return this.save(dataset, 'local', analysis.thesis, false);
   }
 
   async findExisting(provider?: AnalysisProvider): Promise<AnalysisRecord | null> {
@@ -51,13 +61,14 @@ export class ResolveThesisArtifactUseCase {
       await this.analyses.setActive(existing.analysisId);
       return existing;
     }
-    return this.save(dataset, 'gateway', thesis);
+    return this.save(dataset, 'gateway', thesis, true);
   }
 
   private async save(
     dataset: DatasetRecord,
     provider: AnalysisProvider,
     thesis: TradeThesis,
+    activate: boolean,
   ): Promise<AnalysisRecord> {
     const local = analyzeSession([...dataset.candles]);
     const artifact = await this.analyses.save({
@@ -68,7 +79,7 @@ export class ResolveThesisArtifactUseCase {
       schemaVersion: 'thesis-v1',
       createdAt: this.now(),
     });
-    await this.analyses.setActive(artifact.analysisId);
+    if (activate) await this.analyses.setActive(artifact.analysisId);
     return artifact;
   }
 

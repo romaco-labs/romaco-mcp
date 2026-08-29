@@ -53,7 +53,7 @@ export function registerSetupChart(
           lookback,
           rawCandles,
         });
-        const artifact = await resolveThesis.resolve();
+        const artifact = await resolveThesis.resolveForDataset(result.dataset.datasetId);
         const { dataset } = result;
         const first = dataset.candles[0];
         const last = dataset.candles[dataset.candles.length - 1];
