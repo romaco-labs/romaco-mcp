@@ -68,6 +68,34 @@ Optional browser bridge stays in `src/adapters/outbound/chart/**`:
 Environment parsing and construction stay in `src/bootstrap/**`.
 `src/bridge.ts` remains a compatibility shim only.
 
+### Reconnect desired state
+
+Reconnect recovery follows same dependency direction:
+
+```text
+WebSocket `ready`
+    |
+    v
+ChartReadyReconciliationAdapter (bootstrap/inbound wiring)
+    |
+    v
+ReconcileChartStateUseCase
+    |                     |
+    v                     v
+ChartPort        ChartDesiredStatePort
+```
+
+`ReconcileChartStateUseCase` knows no WebSocket, MCP handler, process singleton,
+session, or bridge protocol. Production adapts current in-memory journal through
+`LegacyChartJournal`; tests and evals may inject isolated implementations.
+
+Desired entries crossing application port require exact `chartId + symbol +
+timeframe`. Reconnect recaptures desired state after readiness waits, checks
+generation around every async write, and rebinds live resource IDs from observed
+state. Therefore a removed indicator/alert remains removed, stale ready events
+stop before later writes, and symbol-bound AAPL state never writes onto TSLA.
+Atomic drawing groups replay only through one `replaceDrawingGroup` command.
+
 ### Composition root
 
 Runtime construction belongs in `src/bootstrap/**` and process startup belongs
@@ -87,6 +115,8 @@ in `src/index.ts`. Only the composition root chooses concrete adapters.
 7. Tool handlers never access storage, gateway, chart bridge, or market-data
    implementations directly.
 8. External payloads are validated at their adapter boundary.
+9. Transport `ready` callbacks invoke reconciliation through composition root;
+   application code never registers bridge callbacks itself.
 
 `test/architecture/dependency_rules.test.ts` enforces these rules for new
 layers plus `compression/**`. Root modules and `src/tools/**` are temporary

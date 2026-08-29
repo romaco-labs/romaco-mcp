@@ -137,3 +137,19 @@ Negative:
 3. Isolate chart bridge and desired-state reconciliation behind ports.
 4. Enforce chart/dataset identity and atomic idempotent drawing replacement.
 5. Add structured MCP output contracts, security adapters, traces, and evals.
+
+## Implementation note — 2026-08-29
+
+Reconnect desired-state recovery now implements items 3 and 4 incrementally:
+
+- `ReconcileChartStateUseCase` depends on `ChartPort` and
+  `ChartDesiredStatePort` only;
+- `ChartReadyReconciliationAdapter` converts authenticated/legacy bridge
+  `ready` events into use-case execution at composition root;
+- indicator, drawing, group, and alert replay is scoped by exact chart identity;
+- group replay stays atomic and idempotent;
+- removal and resource-ID refresh are expressed through desired-state port,
+  preventing reconnect resurrection after successful host removal.
+
+Root `chartState` remains temporary in-memory storage behind
+`LegacyChartJournal`; application reconciliation no longer imports it.
