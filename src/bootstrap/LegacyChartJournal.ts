@@ -1,10 +1,11 @@
 import type { ChartJournalPort } from '../application/ports/chartJournal.js';
+import type { ChartDrawingJournalPort } from '../application/ports/chartDrawingJournal.js';
 import type { ChartPresetIndicator } from '../application/ports/chartPresetCatalog.js';
 import type { ChartIdentity } from '../domain/chart/model.js';
 import type { ChartCommand } from '../domain/chart/model.js';
 import { chartState } from '../chartState.js';
 
-export class LegacyChartJournal implements ChartJournalPort {
+export class LegacyChartJournal implements ChartJournalPort, ChartDrawingJournalPort {
   recordIndicator(
     indicator: ChartPresetIndicator,
     identity: ChartIdentity,
@@ -15,6 +16,14 @@ export class LegacyChartJournal implements ChartJournalPort {
       identity.symbol ?? null,
       resourceId,
     );
+  }
+
+  recordDrawing(
+    drawing: Extract<ChartCommand, { action: 'addDrawing' }>,
+    identity: ChartIdentity,
+    resourceId?: string,
+  ): void {
+    chartState.recordDrawing(drawing, identity, resourceId);
   }
 
   replaceDrawingGroup(
