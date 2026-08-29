@@ -49,7 +49,9 @@ export function registerRemoveAlert(
         );
         if (!result.success) throw new Error(result.error ?? 'Chart rejected alert removal.');
         const removed = (result.data as { removed?: unknown } | undefined)?.removed !== false;
-        if (removed) desiredState.removeAlert(alert.id, alert.price, alert.direction);
+        if (removed) {
+          desiredState.removeAlert(context.identity, alert.id, alert.price, alert.direction);
+        }
         return {
           status: removed ? 'ok' as const : 'noop' as const,
           data: {

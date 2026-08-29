@@ -48,7 +48,9 @@ export function registerRemoveIndicator(
         );
         if (!result.success) throw new Error(result.error ?? 'Chart rejected indicator removal.');
         const removed = (result.data as { removed?: unknown } | undefined)?.removed !== false;
-        if (removed) desiredState.removeIndicator(indicator.id, indicator.type, indicator.params);
+        if (removed) {
+          desiredState.removeIndicator(context.identity, indicator.id, indicator.type, indicator.params);
+        }
         return {
           status: removed ? 'ok' as const : 'noop' as const,
           data: {

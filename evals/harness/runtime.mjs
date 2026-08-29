@@ -78,6 +78,7 @@ class EvalChartJournal {
     this.drawings = [];
     this.alerts = [];
     this.groups = new Map();
+    this.revision = 0;
   }
 
   sameIdentity(left, right) {
@@ -89,33 +90,49 @@ class EvalChartJournal {
 
   recordIndicator(indicator, identity, resourceId) {
     this.indicators.push({ indicator: structuredClone(indicator), identity: structuredClone(identity), resourceId });
+    this.revision += 1;
   }
 
   recordDrawing(drawing, identity, resourceId) {
     this.drawings.push({ drawing: structuredClone(drawing), identity: structuredClone(identity), resourceId });
+    this.revision += 1;
   }
 
   recordAlert(alert, identity, resourceId) {
     this.alerts.push({ alert: structuredClone(alert), identity: structuredClone(identity), resourceId });
+    this.revision += 1;
   }
 
-  removeIndicator(resourceId, indicatorType, params = []) {
-    const exact = this.indicators.findIndex((entry) => entry.resourceId === resourceId);
+  removeIndicator(identity, resourceId, indicatorType, params = []) {
+    const exact = this.indicators.findIndex((entry) =>
+      this.sameIdentity(entry.identity, identity) && entry.resourceId === resourceId,
+    );
     const fallback = this.indicators.findIndex((entry) =>
-      entry.indicator.type.toLowerCase() === indicatorType.toLowerCase()
+      this.sameIdentity(entry.identity, identity)
+      && entry.indicator.type.toLowerCase() === indicatorType.toLowerCase()
       && JSON.stringify(entry.indicator.params ?? []) === JSON.stringify(params),
     );
     const index = exact >= 0 ? exact : fallback;
-    if (index >= 0) this.indicators.splice(index, 1);
+    if (index >= 0) {
+      this.indicators.splice(index, 1);
+      this.revision += 1;
+    }
   }
 
-  removeAlert(resourceId, price, direction) {
-    const exact = this.alerts.findIndex((entry) => entry.resourceId === resourceId);
+  removeAlert(identity, resourceId, price, direction) {
+    const exact = this.alerts.findIndex((entry) =>
+      this.sameIdentity(entry.identity, identity) && entry.resourceId === resourceId,
+    );
     const fallback = this.alerts.findIndex((entry) =>
-      entry.alert.price === price && (entry.alert.options?.direction ?? 'cross') === direction,
+      this.sameIdentity(entry.identity, identity)
+      && entry.alert.price === price
+      && (entry.alert.options?.direction ?? 'cross') === direction,
     );
     const index = exact >= 0 ? exact : fallback;
-    if (index >= 0) this.alerts.splice(index, 1);
+    if (index >= 0) {
+      this.alerts.splice(index, 1);
+      this.revision += 1;
+    }
   }
 
   replaceDrawingGroup(groupId, drawings, identity, idempotencyKey, resourceIds) {
@@ -125,6 +142,7 @@ class EvalChartJournal {
       idempotencyKey,
       resourceIds: structuredClone(resourceIds ?? []),
     });
+    this.revision += 1;
   }
 
   listAgentDrawingGroups(identity) {
@@ -149,7 +167,12 @@ class EvalChartJournal {
       && group.identity.datasetId === identity.datasetId
     ) {
       this.groups.delete(groupId);
+      this.revision += 1;
     }
+  }
+
+  structuralRevision() {
+    return this.revision;
   }
 
   snapshot() {
