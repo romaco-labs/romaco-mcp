@@ -68,7 +68,29 @@ export interface ChartCommandResult {
 export interface ChartContext {
   identity: ChartIdentity;
   visibleCandles?: readonly Candle[];
+  totalCandles?: number;
+  indicators?: readonly ChartIndicatorState[];
+  drawings?: readonly ChartDrawingState[];
+  alerts?: readonly ChartAlertState[];
   raw?: unknown;
+}
+
+export interface ChartIndicatorState {
+  id?: string;
+  type: string;
+  params: readonly number[];
+}
+
+export interface ChartDrawingState {
+  id?: string;
+  type: string;
+  points: readonly ChartDrawingPoint[];
+}
+
+export interface ChartAlertState {
+  id?: string;
+  price: number;
+  direction: 'above' | 'below' | 'cross';
 }
 
 export interface ReplaceDrawingGroupCommand {
