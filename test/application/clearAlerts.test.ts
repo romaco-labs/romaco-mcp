@@ -26,7 +26,7 @@ function fixture(initialAlerts: ChartAlertState[] = [
     replaceDrawingGroup: vi.fn(),
     captureSnapshot: vi.fn(),
   };
-  const removeAlert = vi.fn((alertId: string) => {
+  const removeAlert = vi.fn((_identity: typeof identity, alertId: string) => {
     alerts = alerts.filter((alert) => alert.id !== alertId);
   });
   return {
@@ -88,6 +88,8 @@ describe('ClearAlertsUseCase', () => {
     );
     expect(context.execute.mock.calls.every(([command]) => command.action !== 'clearAlerts')).toBe(true);
     expect(context.removeAlert).toHaveBeenCalledTimes(2);
+    expect(context.removeAlert).toHaveBeenNthCalledWith(1, identity, 'alert-a', 140, 'below');
+    expect(context.removeAlert).toHaveBeenNthCalledWith(2, identity, 'alert-b', 160, 'above');
   });
 
   it('reports partial apply and journals only successful alert removals', async () => {
@@ -102,6 +104,6 @@ describe('ClearAlertsUseCase', () => {
       details: { appliedAlertIds: ['alert-a'], failedAlertId: 'alert-b' },
     });
     expect(context.removeAlert).toHaveBeenCalledOnce();
-    expect(context.removeAlert).toHaveBeenCalledWith('alert-a', 140, 'below');
+    expect(context.removeAlert).toHaveBeenCalledWith(identity, 'alert-a', 140, 'below');
   });
 });

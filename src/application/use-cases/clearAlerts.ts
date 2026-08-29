@@ -137,7 +137,7 @@ export class ClearAlertsUseCase {
           { expectedIdentity: current.identity },
         );
         if (!result.success) throw new Error(result.error ?? 'Chart rejected alert removal.');
-        this.desiredState.removeAlert(alert.alertId, alert.price, alert.direction);
+        this.desiredState.removeAlert(current.identity, alert.alertId, alert.price, alert.direction);
         removedAlertIds.push(alert.alertId);
       } catch (cause) {
         if (removedAlertIds.length > 0) {
