@@ -56,18 +56,29 @@ describe('27-tool contract catalog', () => {
     }
   });
 
-  it('decorates all 27 advertised tools with catalog metadata', async () => {
+  it('advertises output contracts only for the seven actually structured tools', async () => {
     const advertised = await client.listTools();
+    expect(advertised.tools.filter((tool) => tool.outputSchema)).toHaveLength(7);
     for (const tool of advertised.tools) {
       const entry = ROMACO_TOOL_CATALOG_BY_NAME.get(tool.name as never);
       expect(entry).toBeTruthy();
       expect(tool.title).toBe(entry!.title);
       expect(tool.annotations).toEqual(entry!.annotations);
       expect(tool._meta?.['io.romaco/risk']).toEqual(entry!.risk);
-      expect(tool._meta?.['io.romaco/output-contract']).toEqual({
-        schemaId: entry!.output.schemaId,
-        contentKinds: entry!.output.contentKinds,
-      });
+      if (tool.outputSchema) {
+        expect(tool._meta?.['io.romaco/output-contract']).toEqual({
+          schemaId: entry!.output.schemaId,
+          contentKinds: entry!.output.contentKinds,
+          status: 'structured',
+        });
+        expect(tool._meta?.['io.romaco/output-migration']).toBeUndefined();
+      } else {
+        expect(tool._meta?.['io.romaco/output-contract']).toBeUndefined();
+        expect(tool._meta?.['io.romaco/output-migration']).toEqual({
+          schemaId: entry!.output.schemaId,
+          status: 'legacy',
+        });
+      }
     }
   });
 

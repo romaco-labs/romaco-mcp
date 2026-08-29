@@ -13,6 +13,7 @@ export function decorateServerWithToolCatalog(server: McpServer): McpServer {
     if (!entry) {
       throw new Error(`Public MCP tool ${name} is missing from ROMACO_TOOL_CATALOG.`);
     }
+    const structured = config.outputSchema !== undefined;
     return registerTool(
       name,
       {
@@ -22,10 +23,20 @@ export function decorateServerWithToolCatalog(server: McpServer): McpServer {
         _meta: {
           ...config._meta,
           'io.romaco/risk': entry.risk,
-          'io.romaco/output-contract': {
-            schemaId: entry.output.schemaId,
-            contentKinds: entry.output.contentKinds,
-          },
+          ...(structured
+            ? {
+                'io.romaco/output-contract': {
+                  schemaId: entry.output.schemaId,
+                  contentKinds: entry.output.contentKinds,
+                  status: 'structured',
+                },
+              }
+            : {
+                'io.romaco/output-migration': {
+                  schemaId: entry.output.schemaId,
+                  status: 'legacy',
+                },
+              }),
         },
       },
       callback,
