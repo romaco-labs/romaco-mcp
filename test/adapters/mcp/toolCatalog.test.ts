@@ -56,6 +56,21 @@ describe('27-tool contract catalog', () => {
     }
   });
 
+  it('decorates all 27 advertised tools with catalog metadata', async () => {
+    const advertised = await client.listTools();
+    for (const tool of advertised.tools) {
+      const entry = ROMACO_TOOL_CATALOG_BY_NAME.get(tool.name as never);
+      expect(entry).toBeTruthy();
+      expect(tool.title).toBe(entry!.title);
+      expect(tool.annotations).toEqual(entry!.annotations);
+      expect(tool._meta?.['io.romaco/risk']).toEqual(entry!.risk);
+      expect(tool._meta?.['io.romaco/output-contract']).toEqual({
+        schemaId: entry!.output.schemaId,
+        contentKinds: entry!.output.contentKinds,
+      });
+    }
+  });
+
   it('never labels destructive tools as low risk with no approval policy', () => {
     const unsafe = ROMACO_TOOL_CATALOG.filter(
       (tool) => tool.annotations.destructiveHint

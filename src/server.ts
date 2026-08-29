@@ -27,6 +27,7 @@ import { registerListPanes } from './tools/list_panes.js';
 import { registerGetIndicatorValues } from './tools/get_indicator_values.js';
 import { registerGoToTimestamp } from './tools/go_to_timestamp.js';
 import { createProductionRuntime, type ApplicationRuntime } from './bootstrap/runtime.js';
+import { decorateServerWithToolCatalog } from './adapters/inbound/mcp/catalogDecorator.js';
 
 // Versión SIEMPRE desde package.json — la 0.0.2 hardcodeada quedó
 // desincronizada del paquete publicado (0.0.3) y serverInfo mentía.
@@ -35,10 +36,10 @@ const { version: PKG_VERSION } = createRequire(import.meta.url)('../package.json
 };
 
 export function createServer(runtime: ApplicationRuntime = createProductionRuntime()): McpServer {
-  const server = new McpServer({
+  const server = decorateServerWithToolCatalog(new McpServer({
     name: 'romaco',
     version: PKG_VERSION,
-  });
+  }));
 
   // Browser-bridge tools (require <McpBridge /> in user's app)
   registerGetChartContext(server, runtime.chart);
