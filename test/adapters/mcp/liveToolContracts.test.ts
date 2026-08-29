@@ -10,6 +10,7 @@ import type { ChartPort } from '../../../src/application/ports/chart.js';
 import { createAnalysisId } from '../../../src/domain/analysis/model.js';
 import { createChartId } from '../../../src/domain/chart/model.js';
 import { createDatasetId } from '../../../src/domain/dataset/model.js';
+import { InMemoryApprovalStore } from '../../../src/adapters/outbound/security/InMemoryApprovalStore.js';
 
 const identity = {
   chartId: createChartId('chart_aapl'),
@@ -49,29 +50,30 @@ describe('live hex MCP output contracts', () => {
   beforeEach(async () => {
     server = new McpServer({ name: 'live-contract-test', version: '0.0.0' });
     const chartPort = chart();
+    const artifact = {
+      analysisId: createAnalysisId('analysis_aapl'),
+      datasetId: identity.datasetId,
+      provider: 'local' as const,
+      summary: {},
+      thesis: {
+        bias: 'bullish' as const,
+        verdict: 'long' as const,
+        confidence: 0.8,
+        bull: [],
+        bear: [],
+        setup: { entry: 150, stop: 145, target: 160, rr: 2, basis: 'fixture' },
+        invalidation: { price: 145, reason: 'stop' },
+        horizon: 'position' as const,
+        notes: [],
+      },
+      schemaVersion: 'thesis-v1' as const,
+      createdAt: 1,
+    };
     registerGetChartContext(server, chartPort);
     registerListPanes(server, chartPort);
     registerAnnotate(server, {
       execute: async () => ({
-        artifact: {
-          analysisId: createAnalysisId('analysis_aapl'),
-          datasetId: identity.datasetId,
-          provider: 'local',
-          summary: {},
-          thesis: {
-            bias: 'bullish',
-            verdict: 'long',
-            confidence: 0.8,
-            bull: [],
-            bear: [],
-            setup: { entry: 150, stop: 145, target: 160, rr: 2, basis: 'fixture' },
-            invalidation: { price: 145, reason: 'stop' },
-            horizon: 'position',
-            notes: [],
-          },
-          schemaVersion: 'thesis-v1',
-          createdAt: 1,
-        },
+        artifact,
         dataset: {
           datasetId: identity.datasetId,
           source: 'raw',
@@ -88,7 +90,9 @@ describe('live hex MCP output contracts', () => {
         resourceIds: ['drawing_1', 'drawing_2'],
         idempotencyKey: 'idem_1',
       }),
-    } as unknown as AnnotateThesisUseCase);
+    } as unknown as AnnotateThesisUseCase, {
+      resolve: async () => artifact,
+    }, new InMemoryApprovalStore({ createToken: () => 'approval_'.padEnd(43, 'x') }));
 
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     await server.connect(serverTransport);
@@ -132,9 +136,18 @@ describe('live hex MCP output contracts', () => {
   });
 
   it('returns analysis/chart/resource identities for an atomic annotation', async () => {
-    const result = await client.callTool({
+    const challenge = await client.callTool({
       name: 'romaco_annotate',
       arguments: { analysisId: 'analysis_aapl' },
+    });
+    expect(challenge.structuredContent).toMatchObject({
+      status: 'error',
+      error: { code: 'APPROVAL_REQUIRED' },
+    });
+    const approvalToken = (challenge.structuredContent as any).error.recovery.parameters.approvalToken;
+    const result = await client.callTool({
+      name: 'romaco_annotate',
+      arguments: { analysisId: 'analysis_aapl', approvalToken },
     });
     expect(result.structuredContent).toMatchObject({
       status: 'ok',
@@ -150,6 +163,14 @@ describe('live hex MCP output contracts', () => {
         scope: 'trade',
         idempotencyKey: 'idem_1',
       },
+    });
+    const replay = await client.callTool({
+      name: 'romaco_annotate',
+      arguments: { analysisId: 'analysis_aapl', approvalToken },
+    });
+    expect(replay.structuredContent).toMatchObject({
+      status: 'error',
+      error: { code: 'APPROVAL_INVALID' },
     });
   });
 

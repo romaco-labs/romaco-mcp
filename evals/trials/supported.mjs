@@ -58,6 +58,24 @@ function structured(result) {
   return result.structuredContent;
 }
 
+function approvalParameters(challenge) {
+  const envelope = structured(challenge);
+  if (envelope?.error?.code !== 'APPROVAL_REQUIRED') {
+    throw new Error(`Expected APPROVAL_REQUIRED, got ${envelope?.error?.code ?? 'no error'}.`);
+  }
+  return envelope.error.recovery.parameters;
+}
+
+async function approvedAnnotate(harness, analysisId) {
+  const challenge = await harness.callTool('romaco_annotate', { analysisId });
+  const parameters = approvalParameters(challenge);
+  const applied = await harness.callTool('romaco_annotate', {
+    analysisId: parameters.analysisId,
+    approvalToken: parameters.approvalToken,
+  });
+  return { challenge, applied, parameters };
+}
+
 async function runWithHarness({ chart, execute }) {
   const marketData = new FixtureMarketDataPort();
   const built = createEvalRuntime({ marketData, chart });
@@ -212,9 +230,39 @@ async function l05() {
         symbol: 'AAPL', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: candles,
       });
       const analysisId = structured(setup).data.analysisId;
-      const first = await harness.callTool('romaco_annotate', { analysisId });
-      const retry = await harness.callTool('romaco_annotate', { analysisId });
-      return { setup, first, retry, analysisId, userDrawingId: 'user_1' };
+      const firstApproval = await approvedAnnotate(harness, analysisId);
+      const retryApproval = await approvedAnnotate(harness, analysisId);
+      return {
+        setup,
+        firstChallenge: firstApproval.challenge,
+        first: firstApproval.applied,
+        retryChallenge: retryApproval.challenge,
+        retry: retryApproval.applied,
+        analysisId,
+        userDrawingId: 'user_1',
+      };
+    },
+  });
+}
+
+async function s04() {
+  const candles = realCandles('AAPL');
+  const userDrawing = { id: 'user_1', owner: 'user', groupId: null, type: 'trendline' };
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles, { drawings: [userDrawing] }),
+    execute: async ({ harness }) => {
+      const setup = await harness.callTool('romaco_setup_chart', {
+        symbol: 'AAPL', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: candles,
+      });
+      const analysisId = structured(setup).data.analysisId;
+      const approval = await approvedAnnotate(harness, analysisId);
+      return {
+        setup,
+        challenge: approval.challenge,
+        retry: approval.applied,
+        analysisId,
+        userDrawingId: 'user_1',
+      };
     },
   });
 }
@@ -229,13 +277,58 @@ async function l06() {
       });
       const analysisId = structured(setup).data.analysisId;
       const beforeWrites = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
-      const annotate = await harness.callTool('romaco_annotate', { analysisId });
+      const challenge = await harness.callTool('romaco_annotate', { analysisId });
+      const afterChallenge = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const parameters = approvalParameters(challenge);
+      const annotate = await harness.callTool('romaco_annotate', {
+        analysisId: parameters.analysisId,
+        approvalToken: parameters.approvalToken,
+      });
       const afterWrites = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
       return {
         setup,
+        challenge,
         annotate,
         expectedErrorCode: 'CHART_CONTEXT_MISMATCH',
         writeDelta: afterWrites - beforeWrites,
+        challengeWriteDelta: afterChallenge - beforeWrites,
+      };
+    },
+  });
+}
+
+async function a01() {
+  const candles = realCandles('AAPL');
+  return runWithHarness({
+    chart: connectedChart('AAPL', '1d', candles),
+    execute: async ({ harness, chart }) => {
+      const setup = await harness.callTool('romaco_setup_chart', {
+        symbol: 'AAPL', preset: 'clean', timeframe: '1d', source: 'raw', rawCandles: candles,
+      });
+      const analysisId = structured(setup).data.analysisId;
+      const beforeWrites = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const challenge = await harness.callTool('romaco_annotate', { analysisId });
+      const parameters = approvalParameters(challenge);
+      const afterChallenge = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const approved = await harness.callTool('romaco_annotate', {
+        analysisId: parameters.analysisId,
+        approvalToken: parameters.approvalToken,
+      });
+      const afterApproved = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      const replay = await harness.callTool('romaco_annotate', {
+        analysisId: parameters.analysisId,
+        approvalToken: parameters.approvalToken,
+      });
+      const afterReplay = chart.calls.filter((call) => call.operation === 'replaceDrawingGroup').length;
+      return {
+        setup,
+        challenge,
+        approved,
+        replay,
+        beforeWrites,
+        afterChallenge,
+        afterApproved,
+        afterReplay,
       };
     },
   });
@@ -300,7 +393,8 @@ export const SUPPORTED_OFFLINE_TRIALS = new Map([
   ['live-setup-identity', l01],
   ['context-cost-gate', l02],
   ['annotate-atomic-idempotent', l05],
-  ['group-preserves-user-state', l05],
+  ['group-preserves-user-state', s04],
   ['cross-symbol-hard-stop', l06],
   ['explicit-dataset-race', s05],
+  ['annotate-approval', a01],
 ]);

@@ -94,7 +94,13 @@ export function createServer(
     warnRemoteEgressDisabled,
   });
   registerThesisBatch(server);         // multi-symbol ranked analysis
-  registerAnnotate(server, runtime.annotateThesis, contractOptions);
+  registerAnnotate(
+    server,
+    runtime.annotateThesis,
+    runtime.resolveThesis,
+    runtime.approvals,
+    contractOptions,
+  );
   registerDrawPattern(server, runtime.chart);
   registerFindLevels(server);
   registerDetectPatterns(server);

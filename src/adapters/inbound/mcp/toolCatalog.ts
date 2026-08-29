@@ -367,7 +367,7 @@ export const ROMACO_TOOL_CATALOG = [
     title: 'Annotate Trade Thesis',
     category: 'chart-write',
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-    risk: { level: 'high', financial: true, approval: 'explicit-user-intent' },
+    risk: { level: 'high', financial: true, approval: 'confirmation-token' },
     output: {
       schemaId: 'romaco.annotate.v1',
       summary: 'Atomic thesis drawing-group replacement result.',

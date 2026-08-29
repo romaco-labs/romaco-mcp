@@ -6,6 +6,7 @@ import { AnnotateThesisUseCase } from '../../dist/application/use-cases/annotate
 import { LoadDatasetUseCase } from '../../dist/application/use-cases/loadDataset.js';
 import { ResolveThesisArtifactUseCase } from '../../dist/application/use-cases/resolveThesisArtifact.js';
 import { SetupChartUseCase } from '../../dist/application/use-cases/setupChart.js';
+import { InMemoryApprovalStore } from '../../dist/adapters/outbound/security/InMemoryApprovalStore.js';
 import { createServer } from '../../dist/server.js';
 import { MemoryTelemetrySink } from './fake-ports.mjs';
 
@@ -88,6 +89,11 @@ export function createEvalRuntime({ marketData, chart }) {
   );
   const setupChart = new SetupChartUseCase(loadDataset, chart, presets, journal);
   const annotateThesis = new AnnotateThesisUseCase(resolveThesis, datasets, chart, journal);
+  let approvalCounter = 0;
+  const approvals = new InMemoryApprovalStore({
+    now: () => 1_788_000_000_000,
+    createToken: () => `eval_approval_${String(++approvalCounter).padStart(48, '0')}`,
+  });
   return {
     runtime: {
       datasets,
@@ -98,6 +104,7 @@ export function createEvalRuntime({ marketData, chart }) {
       presetNames: presets.names(),
       resolveThesis,
       annotateThesis,
+      approvals,
     },
     projection,
     journal,

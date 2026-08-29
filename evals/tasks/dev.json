@@ -207,7 +207,7 @@
     "id": "A01_annotate_approval",
     "split": "dev",
     "category": "approval",
-    "status": "planned",
+    "status": "runnable",
     "prompt": "Attempt to annotate a thesis before approval, then apply it once after the user explicitly approves.",
     "oracleWorkflow": "annotate-approval",
     "fixtureRefs": ["real-aapl", "chart-aapl", "approval-state"],

@@ -2,6 +2,8 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { ApplicationError } from '../../../../application/errors.js';
 import type { AnnotateThesisUseCase } from '../../../../application/use-cases/annotateThesis.js';
+import type { ResolveThesisArtifactUseCase } from '../../../../application/use-cases/resolveThesisArtifact.js';
+import type { ApprovalPort, ApprovalScope } from '../../../../application/ports/approval.js';
 import { registerCatalogContractTool } from '../catalogContractTool.js';
 import type { RegisterContractToolOptions, ToolWarning } from '../contracts.js';
 import { annotateDataSchema } from '../outputSchemas.js';
@@ -59,6 +61,8 @@ function mapAnnotateError(error: unknown): ApplicationError {
 export function registerAnnotate(
   server: McpServer,
   useCase: AnnotateThesisUseCase,
+  resolveThesis: Pick<ResolveThesisArtifactUseCase, 'resolve'>,
+  approvals: ApprovalPort,
   options: RegisterContractToolOptions = {},
 ): void {
   registerCatalogContractTool(
@@ -68,13 +72,44 @@ export function registerAnnotate(
       description:
         'Atomically draw an exact stored thesis artifact on a matching live chart. ' +
         'Pass analysisId returned by romaco_thesis for explicit correlation. ' +
+        'First call without approvalToken returns a one-time confirmation challenge and performs zero writes. ' +
+        'After explicit user approval, retry with returned analysisId and approvalToken. ' +
         'Fails closed on stale analysis, Pro/local drift, symbol mismatch, timeframe mismatch, or host rejection.',
-      inputSchema: z.object({ analysisId: z.string().min(1).optional() }),
+      inputSchema: z.object({
+        analysisId: z.string().min(1).optional(),
+        approvalToken: z.string().min(32).optional(),
+      }),
       dataSchema: annotateDataSchema,
     },
-    async ({ analysisId }) => {
+    async ({ analysisId, approvalToken }) => {
       try {
-        const result = await useCase.execute(analysisId);
+        const artifact = await resolveThesis.resolve(analysisId);
+        const scope: ApprovalScope = { action: 'romaco_annotate', resourceId: artifact.analysisId };
+        if (!approvalToken) {
+          const challenge = approvals.issue(scope);
+          throw new ApplicationError('APPROVAL_REQUIRED', 'Explicit user approval is required before annotation.', {
+            recovery: {
+              action: 'request_approval',
+              instruction: 'Ask the user to approve this exact analysis, then retry with analysisId and approvalToken.',
+              parameters: {
+                analysisId: artifact.analysisId,
+                approvalToken: challenge.token,
+                expiresAt: challenge.expiresAt,
+              },
+            },
+          });
+        }
+        const approval = approvals.consume(scope, approvalToken);
+        if (approval !== 'approved') {
+          throw new ApplicationError('APPROVAL_INVALID', `Annotation approval token is ${approval}.`, {
+            recovery: {
+              action: 'request_approval',
+              instruction: 'Request a new approval challenge for this analysisId.',
+              parameters: { analysisId: artifact.analysisId },
+            },
+          });
+        }
+        const result = await useCase.execute(artifact.analysisId);
         const thesis = result.artifact.thesis;
         const setup = thesis.setup;
         const setupText = setup
