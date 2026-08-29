@@ -95,4 +95,35 @@ describe('romaco_calculate_position_size — camelCase schema (B2)', () => {
     expect(res.isError).toBe(true);
     expect(res.text).toMatch(/entryPrice and stopLoss/);
   });
+
+  it('rejects a target on the losing side of a long entry', async () => {
+    const res = await h.callTool('romaco_calculate_position_size', {
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 98,
+      targetPrice: 95,
+    });
+    expect(res.isError).toBe(true);
+    expect(res.text).toMatch(/above entryPrice/);
+  });
+
+  it('keeps commission-inclusive risk within the requested budget', async () => {
+    const res = await h.callTool('romaco_calculate_position_size', {
+      accountSize: 10_000,
+      riskPct: 1,
+      entryPrice: 100,
+      stopLoss: 97,
+      targetPrice: 109,
+      commissionPerSide: 5,
+    });
+    expect(res.isError).toBe(false);
+    const data = JSON.parse(res.text);
+    expect(data.shares).toBe(30);
+    expect(data.actualDollarRisk).toBeLessThanOrEqual(data.maxDollarRisk);
+    expect(data.riskRewardRatio).toBe(3);
+    expect(data.grossRiskRewardRatio).toBe(3);
+    expect(data.netRiskRewardRatio).toBeCloseTo(2.6);
+    expect(data.netBreakevenWinratePct).toBeCloseTo(27.78, 1);
+  });
 });
