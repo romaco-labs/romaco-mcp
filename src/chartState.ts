@@ -47,7 +47,13 @@ function hasIdentity(entry: JournalEntry, identity: ChartIdentity): boolean {
     && entry.identity.datasetId === identity.datasetId;
 }
 
-class ChartStateJournal {
+function sameIdentity(left: ChartIdentity | undefined, right: ChartIdentity): boolean {
+  return left?.chartId === right.chartId
+    && left.symbol === right.symbol
+    && left.timeframe === right.timeframe;
+}
+
+export class ChartStateJournal {
   private indicators: JournalEntry[] = [];
   private drawings: JournalEntry[] = [];
   private drawingGroups: JournalEntry[] = [];
@@ -56,22 +62,33 @@ class ChartStateJournal {
   /** Record an applied indicator. Deduped by type+params so replays never stack. */
   recordIndicator(
     action: Extract<BridgeAction, { action: 'addIndicator' }>,
-    symbol: string | null,
+    identityOrSymbol: ChartIdentity | string | null,
     resourceId?: string,
   ): void {
     const key = indicatorKey(action);
+    const identity = typeof identityOrSymbol === 'object' && identityOrSymbol !== null
+      ? identityOrSymbol
+      : undefined;
+    const symbol = identity
+      ? identity.symbol ?? null
+      : identityOrSymbol as string | null;
     const existing = this.indicators.findIndex(
-      (e) => indicatorKey(e.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key,
+      (entry) => (
+        indicatorKey(entry.action as Extract<BridgeAction, { action: 'addIndicator' }>) === key
+        && (identity === undefined || sameIdentity(entry.identity, identity))
+      ),
     );
+    const next: JournalEntry = {
+      action,
+      symbol,
+      ...(identity ? { identity: { ...identity } } : {}),
+      ...(resourceId ? { resourceId } : {}),
+    };
     if (existing !== -1) {
-      // Refresh the symbol so the most-recent context wins; indicators replay
-      // regardless of symbol, so this is mostly bookkeeping.
-      this.indicators[existing] = resourceId
-        ? { action, symbol, resourceId }
-        : { action, symbol };
+      this.indicators[existing] = next;
       return;
     }
-    this.indicators.push(resourceId ? { action, symbol, resourceId } : { action, symbol });
+    this.indicators.push(next);
   }
 
   recordDrawing(
@@ -106,7 +123,7 @@ class ChartStateJournal {
     identity: ChartIdentity,
     resourceIds: readonly string[] = [],
   ): void {
-    this.removeDrawingsByGroup(action.groupId);
+    this.removeDrawingsByGroup(action.groupId, identity);
     this.drawingGroups.push({
       action,
       symbol: identity.symbol ?? null,
@@ -122,12 +139,18 @@ class ChartStateJournal {
   }
 
   /** Drop journaled drawings in a group so reconcile won't replay a replaced set. */
-  removeDrawingsByGroup(groupId: string): void {
+  removeDrawingsByGroup(groupId: string, identity?: ChartIdentity): void {
     this.drawings = this.drawings.filter(
-      (e) => (e.action as Extract<BridgeAction, { action: 'addDrawing' }>).groupId !== groupId,
+      (entry) => (
+        (entry.action as Extract<BridgeAction, { action: 'addDrawing' }>).groupId !== groupId
+        || (identity !== undefined && !sameIdentity(entry.identity, identity))
+      ),
     );
     this.drawingGroups = this.drawingGroups.filter(
-      (entry) => (entry.action as Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>).groupId !== groupId,
+      (entry) => (
+        (entry.action as Extract<BridgeAction, { action: 'replaceAgentDrawingGroup' }>).groupId !== groupId
+        || (identity !== undefined && !sameIdentity(entry.identity, identity))
+      ),
     );
   }
 
@@ -177,7 +200,7 @@ class ChartStateJournal {
     if (index >= 0) this.indicators.splice(index, 1);
   }
 
-  bindResourceId(action: BridgeAction, resourceId: string): void {
+  bindResourceId(action: BridgeAction, resourceId: string, identity?: ChartIdentity): void {
     let entries: JournalEntry[] = [];
     let match: (entry: JournalEntry) => boolean = () => false;
     if (action.action === 'addIndicator') {
@@ -200,16 +223,19 @@ class ChartStateJournal {
           && JSON.stringify(candidate.points) === JSON.stringify(action.points);
       };
     }
-    const entry = entries.find(match);
+    const entry = entries.find((candidate) => (
+      match(candidate) && (identity === undefined || sameIdentity(candidate.identity, identity))
+    ));
     if (entry) entry.resourceId = resourceId;
   }
 
-  bindResourceIds(action: BridgeAction, resourceIds: readonly string[]): void {
+  bindResourceIds(action: BridgeAction, resourceIds: readonly string[], identity?: ChartIdentity): void {
     if (action.action !== 'replaceAgentDrawingGroup') return;
     const entry = this.drawingGroups.find((candidate) =>
       candidate.action.action === 'replaceAgentDrawingGroup'
       && candidate.action.groupId === action.groupId
       && candidate.action.idempotencyKey === action.idempotencyKey
+      && (identity === undefined || sameIdentity(candidate.identity, identity))
     );
     if (entry) entry.resourceIds = [...resourceIds];
   }
