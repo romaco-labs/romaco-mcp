@@ -17,6 +17,10 @@ import type { ChartJournalPort } from '../application/ports/chartJournal.js';
 import { AddDrawingUseCase } from '../application/use-cases/addDrawing.js';
 import { LegacyDrawingTemplateCatalog } from './LegacyDrawingTemplateCatalog.js';
 import { AnalyzeBatchUseCase } from '../application/use-cases/analyzeBatch.js';
+import { LegacyAgentDrawingJournal } from './LegacyAgentDrawingJournal.js';
+import { ClearAgentDrawingsUseCase } from '../application/use-cases/clearAgentDrawings.js';
+import { OpenPaperPositionUseCase } from '../application/use-cases/openPaperPosition.js';
+import { InMemoryPaperPositionIdempotencyStore } from '../adapters/outbound/persistence/InMemoryPaperPositionIdempotencyStore.js';
 
 export interface ApplicationRuntime {
   datasets: InMemoryDatasetRepository;
@@ -31,6 +35,8 @@ export interface ApplicationRuntime {
   approvals: ApprovalPort;
   journal: ChartJournalPort;
   analyzeBatch: AnalyzeBatchUseCase;
+  clearAgentDrawings: ClearAgentDrawingsUseCase;
+  openPaperPosition: OpenPaperPositionUseCase;
 }
 
 export function createProductionRuntime(): ApplicationRuntime {
@@ -54,6 +60,8 @@ export function createProductionRuntime(): ApplicationRuntime {
     new LegacySessionDatasetSource(),
   );
   const approvals = new InMemoryApprovalStore();
+  const agentDrawingJournal = new LegacyAgentDrawingJournal();
+  const paperPositionIdempotency = new InMemoryPaperPositionIdempotencyStore();
   return {
     datasets,
     analyses,
@@ -72,6 +80,8 @@ export function createProductionRuntime(): ApplicationRuntime {
       analyses,
       activeProjection,
     ),
+    clearAgentDrawings: new ClearAgentDrawingsUseCase(chart, agentDrawingJournal),
+    openPaperPosition: new OpenPaperPositionUseCase(chart, paperPositionIdempotency),
     annotateThesis: new AnnotateThesisUseCase(
       resolveThesis,
       datasets,

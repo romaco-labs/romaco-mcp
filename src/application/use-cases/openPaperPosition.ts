@@ -2,6 +2,7 @@ import { ApplicationError } from '../errors.js';
 import type { ChartPort } from '../ports/chart.js';
 import type { PaperPositionIdempotencyPort } from '../ports/paperPositionIdempotency.js';
 import {
+  assertPaperPositionIntent,
   paperPositionFingerprint,
   type PaperPositionIntent,
   type PaperPositionReceipt,
@@ -49,6 +50,20 @@ export class OpenPaperPositionUseCase {
   ) {}
 
   async prepare(input: OpenPaperPositionInput): Promise<OpenPaperPositionPreparation> {
+    const idempotencyKey = input.idempotencyKey.trim();
+    if (!idempotencyKey || idempotencyKey.length > 128) {
+      throw new ApplicationError('INVALID_ARGUMENT', 'idempotencyKey must contain 1-128 non-whitespace characters.', {
+        recovery: { action: 'change_input', instruction: 'Provide a stable idempotencyKey for this user intent.' },
+      });
+    }
+    try {
+      assertPaperPositionIntent(input);
+    } catch (cause) {
+      throw new ApplicationError('INVALID_ARGUMENT', cause instanceof Error ? cause.message : String(cause), {
+        recovery: { action: 'change_input', instruction: 'Use finite positive quantity, stopLoss, and takeProfit values.' },
+        cause,
+      });
+    }
     const identity = await this.chart.getIdentity();
     let fingerprint: string;
     try {
@@ -63,7 +78,7 @@ export class OpenPaperPositionUseCase {
         cause,
       });
     }
-    const lookup = this.idempotency.lookup(input.idempotencyKey, fingerprint);
+    const lookup = this.idempotency.lookup(idempotencyKey, fingerprint);
     if (lookup.kind === 'conflict') {
       throw new ApplicationError(
         'IDEMPOTENCY_CONFLICT',
@@ -73,7 +88,7 @@ export class OpenPaperPositionUseCase {
             action: 'change_input',
             instruction: 'Reuse this key only for the exact original payload, or provide a new idempotencyKey.',
           },
-          details: { idempotencyKey: input.idempotencyKey },
+          details: { idempotencyKey },
         },
       );
     }
@@ -81,7 +96,7 @@ export class OpenPaperPositionUseCase {
       throw new ApplicationError('ACTION_DENIED', 'Same paper-position request is already in progress.', {
         retryable: true,
         recovery: { action: 'retry', instruction: 'Retry the exact request after current execution completes.' },
-        details: { idempotencyKey: input.idempotencyKey },
+        details: { idempotencyKey },
       });
     }
     if (lookup.kind === 'replay') return { kind: 'replay', receipt: lookup.receipt };
@@ -96,9 +111,9 @@ export class OpenPaperPositionUseCase {
       kind: 'ready',
       intent,
       identity,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey,
       fingerprint,
-      approvalResourceId: `${input.idempotencyKey}|${fingerprint}`,
+      approvalResourceId: `${idempotencyKey}|${fingerprint}`,
     };
   }
 
@@ -141,12 +156,13 @@ export class OpenPaperPositionUseCase {
         idempotencyKey: preparation.idempotencyKey,
       });
       if (!result.success) throw new Error(result.error ?? 'Chart rejected paper position.');
+      const hostPositionId = readHostPositionId(result.data);
       const receipt: PaperPositionReceipt = {
         mode: 'paper',
         ...preparation.intent,
         chartIdentity: { ...preparation.identity },
         idempotencyKey: preparation.idempotencyKey,
-        ...(readHostPositionId(result.data) ? { hostPositionId: readHostPositionId(result.data) } : {}),
+        ...(hostPositionId ? { hostPositionId } : {}),
       };
       this.idempotency.complete(preparation.idempotencyKey, preparation.fingerprint, receipt);
       return { receipt, replayed: false };
@@ -164,4 +180,3 @@ export class OpenPaperPositionUseCase {
     }
   }
 }
-

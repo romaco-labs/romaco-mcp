@@ -10,8 +10,8 @@ import { registerRemoveAlert } from './tools/remove_alert.js';
 import { registerClearAlerts } from './tools/clear_alerts.js';
 import { registerRemoveIndicator } from './tools/remove_indicator.js';
 import { registerCaptureSnapshot } from './tools/capture_snapshot.js';
-import { registerOpenPaperPosition } from './tools/open_paper_position.js';
-import { registerClearDrawings } from './tools/clear_drawings.js';
+import { registerOpenPaperPosition } from './adapters/inbound/mcp/tools/openPaperPosition.js';
+import { registerClearDrawings } from './adapters/inbound/mcp/tools/clearDrawings.js';
 import { registerLoadCandles } from './tools/load_candles.js';
 import { registerAnalyzeMarket } from './tools/analyze_market.js';
 import { registerThesis } from './tools/thesis.js';
@@ -70,8 +70,18 @@ export function createServer(
   registerClearAlerts(server);
   registerRemoveIndicator(server);
   registerCaptureSnapshot(server, runtime.chart, contractOptions);
-  registerOpenPaperPosition(server);
-  registerClearDrawings(server);
+  registerOpenPaperPosition(
+    server,
+    runtime.openPaperPosition,
+    runtime.approvals,
+    contractOptions,
+  );
+  registerClearDrawings(
+    server,
+    runtime.clearAgentDrawings,
+    runtime.approvals,
+    contractOptions,
+  );
 
   // Living Annotations — Phase 0 unlock
   registerListPanes(server, runtime.chart, contractOptions);

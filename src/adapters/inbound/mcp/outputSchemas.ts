@@ -328,6 +328,34 @@ export const annotateDataSchema = z.object({
   idempotencyKey: z.string().min(1),
 }).strict();
 
+export const clearDrawingsDataSchema = z.object({
+  planId: z.string().min(1),
+  chartId: z.string().min(1),
+  symbol: z.string().min(1),
+  timeframe: timeframeSchema,
+  groupIds: z.array(z.string().refine((value) => value.startsWith('romaco-mcp/'), {
+    message: 'groupId must use reserved romaco-mcp/ namespace',
+  })),
+  removedCount: z.number().int().nonnegative(),
+  scope: z.literal('romaco-agent-groups'),
+}).strict();
+
+export const openPaperPositionDataSchema = z.object({
+  chartId: z.string().min(1),
+  symbol: z.string().min(1),
+  timeframe: timeframeSchema,
+  position: z.object({
+    mode: z.literal('paper'),
+    side: z.enum(['long', 'short']),
+    quantity: z.number().positive(),
+    stopLoss: z.number().positive().optional(),
+    takeProfit: z.number().positive().optional(),
+    hostPositionId: z.string().min(1).optional(),
+  }).strict(),
+  idempotencyKey: z.string().min(1),
+  replayed: z.boolean(),
+}).strict();
+
 export function describeDataset(dataset: {
   datasetId: string;
   symbol: string;

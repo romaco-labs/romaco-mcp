@@ -22,6 +22,17 @@ function fixture() {
 }
 
 describe('OpenPaperPositionUseCase', () => {
+  it.each([
+    { side: 'long' as const, quantity: 0, idempotencyKey: 'invalid-zero' },
+    { side: 'long' as const, quantity: Number.NaN, idempotencyKey: 'invalid-nan' },
+    { side: 'short' as const, quantity: 1, stopLoss: -1, idempotencyKey: 'invalid-stop' },
+    { side: 'short' as const, quantity: 1, takeProfit: Number.POSITIVE_INFINITY, idempotencyKey: 'invalid-target' },
+  ])('enforces numeric invariants outside MCP adapter: $idempotencyKey', async (input) => {
+    const context = fixture();
+    await expect(context.useCase.prepare(input)).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(context.chart.execute).not.toHaveBeenCalled();
+  });
+
   it('opens only a paper action with exact identity after preparation', async () => {
     const context = fixture();
     const prepared = await context.useCase.prepare({
@@ -88,4 +99,3 @@ describe('OpenPaperPositionUseCase', () => {
     await expect(context.useCase.prepare(input)).resolves.toMatchObject({ kind: 'ready' });
   });
 });
-

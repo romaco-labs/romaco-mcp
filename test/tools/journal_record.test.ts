@@ -38,14 +38,24 @@ describe('mutating tools record into the chartState journal', () => {
     }
   });
 
-  it('romaco_clear_drawings empties the drawings bucket', async () => {
+  it('romaco_clear_drawings removes approved agent group from journal', async () => {
     chartState.recordDrawing(
-      { action: 'addDrawing', drawingType: 'trendline', points: [{ timestamp: 1, price: 10 }, { timestamp: 2, price: 20 }] },
+      {
+        action: 'addDrawing',
+        drawingType: 'trendline',
+        groupId: 'romaco-mcp/manual',
+        points: [{ timestamp: 1, price: 10 }, { timestamp: 2, price: 20 }],
+      },
       AAPL_DAILY,
     );
     const { callTool, close } = await createTestClient();
     try {
-      await callTool('romaco_clear_drawings', {});
+      const preview = await callTool('romaco_clear_drawings', {});
+      const parameters = (preview.raw.structuredContent as any).error.recovery.parameters;
+      await callTool('romaco_clear_drawings', {
+        planId: parameters.planId,
+        approvalToken: parameters.approvalToken,
+      });
       expect(chartState.snapshot().drawings).toHaveLength(0);
     } finally {
       await close();

@@ -16,6 +16,17 @@ export interface PaperPositionReceipt extends PaperPositionIntent {
   hostPositionId?: string;
 }
 
+export function assertPaperPositionIntent(intent: PaperPositionIntent): void {
+  if (!Number.isFinite(intent.quantity) || intent.quantity <= 0) {
+    throw new Error('Paper position quantity must be finite and greater than zero.');
+  }
+  for (const [name, value] of [['stopLoss', intent.stopLoss], ['takeProfit', intent.takeProfit]] as const) {
+    if (value !== undefined && (!Number.isFinite(value) || value <= 0)) {
+      throw new Error(`Paper position ${name} must be finite and greater than zero.`);
+    }
+  }
+}
+
 function exactIdentity(identity: ChartIdentity): asserts identity is ChartIdentity & {
   symbol: string;
   timeframe: NonNullable<ChartIdentity['timeframe']>;
@@ -36,6 +47,7 @@ export function paperPositionFingerprint(
   intent: PaperPositionIntent,
 ): string {
   exactIdentity(identity);
+  assertPaperPositionIntent(intent);
   return [
     'paper-position-v1',
     part(identity.chartId),
@@ -48,4 +60,3 @@ export function paperPositionFingerprint(
     part(intent.takeProfit),
   ].join('|');
 }
-
