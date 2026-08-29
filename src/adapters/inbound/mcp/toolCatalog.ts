@@ -297,7 +297,7 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.setup-chart.v1',
       summary: 'Loaded dataset, applied preset result, and deterministic analysis.',
-      dataFields: ['dataset', 'preset', 'analysis', 'degraded'],
+      dataFields: ['dataset', 'analysisId', 'provider', 'analysis', 'preset', 'resourceIds'],
       identityFields: ['chartId', 'datasetId', 'analysisId', 'symbol', 'timeframe'],
       contentKinds: TEXT,
       supportsPartial: true,
@@ -431,7 +431,11 @@ export const ROMACO_TOOL_CATALOG = [
     output: {
       schemaId: 'romaco.calculate-position-size.v1',
       summary: 'Commission-aware deterministic position sizing result.',
-      dataFields: ['calculationId', 'side', 'size', 'risk', 'reward', 'warnings'],
+      dataFields: [
+        'calculationId', 'side', 'shares', 'entryPrice', 'stopLoss', 'stopDistance',
+        'positionValue', 'positionPctOfAccount', 'maxDollarRisk', 'actualDollarRisk',
+        'riskPctOfAccount', 'targetPrice', 'grossRiskRewardRatio', 'netRiskRewardRatio',
+      ],
       identityFields: [],
       contentKinds: TEXT,
     },

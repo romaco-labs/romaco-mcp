@@ -1,12 +1,20 @@
+import { createHash } from 'node:crypto';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { ApplicationError } from '../../../../application/errors.js';
 import { CalculatePositionSizeUseCase } from '../../../../application/use-cases/calculatePositionSize.js';
+import { PositionSizeError } from '../../../../domain/risk/calculatePositionSize.js';
+import { registerCatalogContractTool } from '../catalogContractTool.js';
+import type { RegisterContractToolOptions } from '../contracts.js';
+import { positionSizeDataSchema } from '../outputSchemas.js';
 
 export function registerCalculatePositionSize(
   server: McpServer,
   useCase = new CalculatePositionSizeUseCase(),
+  options: RegisterContractToolOptions = {},
 ): void {
-  server.registerTool(
+  registerCatalogContractTool(
+    server,
     'romaco_calculate_position_size',
     {
       description:
@@ -17,22 +25,23 @@ export function registerCalculatePositionSize(
         'riskRewardRatio and breakevenWinratePct remain gross for compatibility; grossRiskRewardRatio, ' +
         'netRiskRewardRatio, and netBreakevenWinratePct make commission treatment explicit. ' +
         'Targets on the losing side of the entry are rejected. Pure math — no data source or browser needed.',
-      inputSchema: {
+      inputSchema: z.object({
         accountSize: z.number().positive().describe('Total account value in USD (e.g., 10000)'),
         riskPct: z.number().min(0.1).max(10).describe(
-          'Max risk as percentage of account (e.g., 1 = risk 1% = $100 on a $10,000 account). Recommended: 0.5–2%.'
+          'Max risk as percentage of account. Recommended: 0.5–2%.',
         ),
         entryPrice: z.number().positive().describe('Planned entry price per share/unit'),
         stopLoss: z.number().positive().describe(
-          'Stop loss price. Must be below entry for longs, above for shorts.'
+          'Stop loss price. Must be below entry for longs, above for shorts.',
         ),
         targetPrice: z.number().positive().optional().describe(
-          'Take profit target. Must be above entry for longs or below entry for shorts.'
+          'Take profit target. Must be above entry for longs or below entry for shorts.',
         ),
         commissionPerSide: z.number().min(0).optional().describe(
-          'Fixed commission per trade side in USD (default 0). Round-trip commission counts toward max risk.'
+          'Fixed commission per trade side in USD. Round-trip commission counts toward max risk.',
         ),
-      },
+      }),
+      dataSchema: positionSizeDataSchema,
     },
     async ({ accountSize, riskPct, entryPrice, stopLoss, targetPrice, commissionPerSide = 0 }) => {
       try {
@@ -44,16 +53,28 @@ export function registerCalculatePositionSize(
           targetPrice,
           commissionPerSide,
         });
-        return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
-      } catch (err) {
+        const calculationId = `calculation_${createHash('sha256')
+          .update(JSON.stringify({ accountSize, riskPct, entryPrice, stopLoss, targetPrice, commissionPerSide }))
+          .digest('hex')
+          .slice(0, 20)}`;
         return {
-          content: [{
-            type: 'text' as const,
-            text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-          }],
-          isError: true,
+          data: { calculationId, ...result },
+          // Preserve v0.x human/text contract for existing MCP clients.
+          summary: JSON.stringify(result, null, 2),
         };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new ApplicationError('INVALID_ARGUMENT', `Error: ${message}`, {
+          recovery: {
+            action: 'change_input',
+            instruction: error instanceof PositionSizeError && error.code === 'target_wrong_side'
+              ? 'Move targetPrice to the profitable side of entryPrice.'
+              : 'Correct the position-sizing inputs and retry.',
+          },
+          cause: error,
+        });
       }
     },
+    options,
   );
 }

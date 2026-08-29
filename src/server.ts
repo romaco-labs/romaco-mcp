@@ -62,7 +62,7 @@ export function createServer(runtime: ApplicationRuntime = createProductionRunti
 
   // Headless data + analysis tools (no browser required)
   registerListTemplates(server);
-  registerSetupChart(server, runtime.setupChart, runtime.presetNames);
+  registerSetupChart(server, runtime.setupChart, runtime.resolveThesis, runtime.presetNames);
   registerLoadCandles(server, runtime.loadDataset);
   registerAnalyzeMarket(server);
   registerThesis(server, runtime.resolveThesis);

@@ -1,28 +1,30 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { ApplicationError } from '../../../../application/errors.js';
+import type { ResolveThesisArtifactUseCase } from '../../../../application/use-cases/resolveThesisArtifact.js';
 import type { SetupChartUseCase } from '../../../../application/use-cases/setupChart.js';
 import { trimPatternHits } from '../../../../compression/snapshot.js';
 import type { MarketDataSource, Timeframe } from '../../../../domain/dataset/model.js';
-
-const TIMEFRAMES = [
-  '1m', '2m', '5m', '15m', '30m',
-  '1h', '2h', '4h',
-  '1d', '5d', '1w', '1mo', '3mo',
-] as const;
+import { registerCatalogContractTool } from '../catalogContractTool.js';
+import type { RegisterContractToolOptions, ToolWarning } from '../contracts.js';
+import { describeDataset, setupChartDataSchema, TIMEFRAMES } from '../outputSchemas.js';
 
 export function registerSetupChart(
   server: McpServer,
   useCase: SetupChartUseCase,
+  resolveThesis: ResolveThesisArtifactUseCase,
   presetNames: readonly string[],
+  options: RegisterContractToolOptions = {},
 ): void {
-  server.registerTool(
+  registerCatalogContractTool(
+    server,
     'romaco_setup_chart',
     {
       description:
         'Prepare an identified OHLCV analysis dataset and run deterministic market analysis. ' +
         'When a browser chart is connected, preset indicators are applied only if live symbol and timeframe exactly match. ' +
         `Available presets: ${presetNames.join(', ')}.`,
-      inputSchema: {
+      inputSchema: z.object({
         symbol: z.string().min(1),
         preset: z.string().refine((value) => presetNames.includes(value), {
           message: `Preset must be one of: ${presetNames.join(', ')}`,
@@ -37,8 +39,9 @@ export function registerSetupChart(
           low: z.number(),
           close: z.number(),
           volume: z.number(),
-        })).optional(),
-      },
+        }).strict()).optional(),
+      }),
+      dataSchema: setupChartDataSchema,
     },
     async ({ symbol, preset, timeframe, source, lookback, rawCandles }) => {
       try {
@@ -50,12 +53,14 @@ export function registerSetupChart(
           lookback,
           rawCandles,
         });
+        const artifact = await resolveThesis.resolve();
         const { dataset } = result;
         const first = dataset.candles[0];
         const last = dataset.candles[dataset.candles.length - 1];
         const lines = [
           `✓ Loaded ${dataset.candles.length} candles — ${dataset.symbol} ${dataset.timeframe} via ${dataset.source}`,
           `  datasetId=${dataset.datasetId}`,
+          `  analysisId=${artifact.analysisId} provider=${artifact.provider}`,
           `  Range: ${new Date(first.timestamp * 1000).toISOString().slice(0, 10)} → ${new Date(last.timestamp * 1000).toISOString().slice(0, 10)}`,
           `  Last close: ${last.close.toFixed(2)}`,
         ];
@@ -90,16 +95,66 @@ export function registerSetupChart(
             .slice(0, 5),
         };
         lines.push('\n─── Market Analysis ───', JSON.stringify(compactSummary));
-        return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
-      } catch (error) {
+
+        const warnings: ToolWarning[] = [];
+        if (result.liveStatus === 'disconnected') {
+          warnings.push({ code: 'CHART_DISCONNECTED', message: 'Preset indicators were not applied.' });
+        } else if (result.liveStatus === 'identity_mismatch') {
+          warnings.push({ code: 'CHART_CONTEXT_MISMATCH', message: 'Preset indicators were skipped.' });
+        } else if (result.liveStatus === 'unavailable') {
+          warnings.push({ code: 'CHART_UNAVAILABLE', message: result.liveError ?? 'Chart identity unavailable.' });
+        }
+        const failedIndicators = result.indicators.filter((indicator) => !indicator.success);
+        if (failedIndicators.length) {
+          warnings.push({
+            code: 'INDICATOR_PARTIAL_APPLY',
+            message: `${failedIndicators.length} preset indicator(s) were rejected by the chart host.`,
+          });
+        }
+        const resourceIds = result.indicators.flatMap(
+          (indicator) => indicator.resourceId ? [indicator.resourceId] : [],
+        );
         return {
-          content: [{
-            type: 'text' as const,
-            text: `Failed to load data: ${error instanceof Error ? error.message : String(error)}`,
-          }],
-          isError: true,
+          status: warnings.length ? 'partial' : 'ok',
+          data: {
+            dataset: describeDataset(dataset),
+            analysisId: artifact.analysisId,
+            provider: artifact.provider,
+            analysis: artifact.summary,
+            preset: {
+              name: result.presetName,
+              liveStatus: result.liveStatus,
+              chartId: result.chartIdentity?.chartId ?? null,
+              indicators: result.indicators,
+            },
+            resourceIds,
+          },
+          summary: lines.join('\n'),
+          context: {
+            chartId: result.chartIdentity?.chartId,
+            datasetId: dataset.datasetId,
+            analysisId: artifact.analysisId,
+            symbol: dataset.symbol,
+            timeframe: dataset.timeframe,
+          },
+          warnings,
         };
+      } catch (error) {
+        const selectedSource = source ?? 'yfinance';
+        const message = error instanceof Error ? error.message : String(error);
+        throw new ApplicationError(
+          selectedSource === 'raw' ? 'INVALID_ARGUMENT' : 'DATA_SOURCE_UNAVAILABLE',
+          `Failed to load data: ${message}`,
+          {
+            retryable: selectedSource !== 'raw',
+            recovery: selectedSource === 'raw'
+              ? { action: 'change_input', instruction: 'Correct raw OHLCV data and retry setup.' }
+              : { action: 'retry', instruction: 'Retry later or provide rawCandles.' },
+            cause: error,
+          },
+        );
       }
     },
+    options,
   );
 }
