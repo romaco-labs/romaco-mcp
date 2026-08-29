@@ -97,5 +97,9 @@ describe('OpenPaperPositionUseCase', () => {
     await expect(context.useCase.execute(first)).rejects.toMatchObject({ code: 'ACTION_DENIED' });
 
     await expect(context.useCase.prepare(input)).resolves.toMatchObject({ kind: 'ready' });
+    await expect(context.useCase.prepare({
+      ...input,
+      quantity: 2,
+    })).rejects.toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
   });
 });

@@ -20,5 +20,13 @@ describe('InMemoryPaperPositionIdempotencyStore', () => {
     store.complete('key', 'payload-a', receipt);
     expect(store.lookup('key', 'payload-a')).toEqual({ kind: 'replay', receipt });
   });
-});
 
+  it('retains payload binding when exact request is released for retry', () => {
+    const store = new InMemoryPaperPositionIdempotencyStore();
+    expect(store.reserve('key', 'payload-a')).toBe(true);
+    store.release('key', 'payload-a');
+    expect(store.lookup('key', 'payload-a')).toEqual({ kind: 'missing' });
+    expect(store.lookup('key', 'payload-b')).toEqual({ kind: 'conflict' });
+    expect(store.reserve('key', 'payload-a')).toBe(true);
+  });
+});
