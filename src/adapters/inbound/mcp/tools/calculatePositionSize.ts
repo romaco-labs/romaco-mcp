@@ -26,18 +26,18 @@ export function registerCalculatePositionSize(
         'netRiskRewardRatio, and netBreakevenWinratePct make commission treatment explicit. ' +
         'Targets on the losing side of the entry are rejected. Pure math — no data source or browser needed.',
       inputSchema: z.object({
-        accountSize: z.number().positive().describe('Total account value in USD (e.g., 10000)'),
-        riskPct: z.number().min(0.1).max(10).describe(
+        accountSize: z.number().finite().positive().describe('Total account value in USD (e.g., 10000)'),
+        riskPct: z.number().finite().min(0.1).max(10).describe(
           'Max risk as percentage of account. Recommended: 0.5–2%.',
         ),
-        entryPrice: z.number().positive().describe('Planned entry price per share/unit'),
-        stopLoss: z.number().positive().describe(
+        entryPrice: z.number().finite().positive().describe('Planned entry price per share/unit'),
+        stopLoss: z.number().finite().positive().describe(
           'Stop loss price. Must be below entry for longs, above for shorts.',
         ),
-        targetPrice: z.number().positive().optional().describe(
+        targetPrice: z.number().finite().positive().optional().describe(
           'Take profit target. Must be above entry for longs or below entry for shorts.',
         ),
-        commissionPerSide: z.number().min(0).optional().describe(
+        commissionPerSide: z.number().finite().min(0).optional().describe(
           'Fixed commission per trade side in USD. Round-trip commission counts toward max risk.',
         ),
       }),

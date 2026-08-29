@@ -53,6 +53,12 @@ function requirePositiveFinite(name: string, value: number): void {
   }
 }
 
+function requireFiniteResult(name: string, value: number): void {
+  if (!Number.isFinite(value)) {
+    throw new PositionSizeError('invalid_number', `${name} exceeds the supported numeric range.`);
+  }
+}
+
 export function calculatePositionSize(input: CalculatePositionSizeInput): PositionSizeResult {
   const commissionPerSide = input.commissionPerSide ?? 0;
 
@@ -98,9 +104,15 @@ export function calculatePositionSize(input: CalculatePositionSizeInput): Positi
   const roundTripCommission = commissionPerSide * 2;
   const riskAvailableForPriceMove = Math.max(0, maxDollarRisk - roundTripCommission);
   const shares = Math.floor(riskAvailableForPriceMove / stopDistance);
+  if (!Number.isSafeInteger(shares)) {
+    throw new PositionSizeError('invalid_number', 'Calculated shares exceed the safe integer range.');
+  }
   const chargedCommission = shares > 0 ? roundTripCommission : 0;
   const actualDollarRisk = shares * stopDistance + chargedCommission;
   const positionValue = shares * input.entryPrice;
+  requireFiniteResult('maxDollarRisk', maxDollarRisk);
+  requireFiniteResult('actualDollarRisk', actualDollarRisk);
+  requireFiniteResult('positionValue', positionValue);
 
   const result: PositionSizeResult = {
     side,
@@ -125,6 +137,10 @@ export function calculatePositionSize(input: CalculatePositionSizeInput): Positi
       ? potentialProfit / actualDollarRisk
       : null;
     const netBreakevenDenominator = actualDollarRisk + potentialProfit;
+    requireFiniteResult('grossRiskRewardRatio', grossRiskRewardRatio);
+    requireFiniteResult('potentialProfit', potentialProfit);
+    if (netRiskRewardRatio !== null) requireFiniteResult('netRiskRewardRatio', netRiskRewardRatio);
+    requireFiniteResult('netBreakevenDenominator', netBreakevenDenominator);
     result.targetPrice = input.targetPrice;
     result.riskRewardRatio = grossRiskRewardRatio;
     result.grossRiskRewardRatio = grossRiskRewardRatio;

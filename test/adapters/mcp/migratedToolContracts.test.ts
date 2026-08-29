@@ -52,6 +52,21 @@ describe('hex-migrated MCP output contracts', () => {
     });
   });
 
+  it('rejects calculations that exceed JSON-safe financial ranges', async () => {
+    const response = await harness.callTool('romaco_calculate_position_size', {
+      accountSize: 1e308,
+      riskPct: 10,
+      entryPrice: 1e150,
+      stopLoss: 1e150 - 1e140,
+    });
+    expect(response.isError).toBe(true);
+    expect(response.raw.structuredContent).toMatchObject({
+      status: 'error',
+      error: { code: 'INVALID_ARGUMENT' },
+    });
+    expect(JSON.stringify(response.raw)).not.toMatch(/"(positionValue|positionPctOfAccount)":null/);
+  });
+
   it('returns datasetId and compact dataset metadata without raw candles', async () => {
     const response = await harness.callTool('romaco_load_candles', {
       source: 'raw',

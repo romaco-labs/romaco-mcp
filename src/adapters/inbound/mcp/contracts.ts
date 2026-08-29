@@ -164,6 +164,41 @@ function byteLength(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), 'utf8');
 }
 
+/** Build exact JSON data: omit valid optional object fields; reject every lossy coercion. */
+function normalizeJsonSafe(value: unknown, path = '$', seen = new Set<object>()): unknown {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (Number.isFinite(value)) return value;
+    throw new ApplicationError('INTERNAL', 'Tool produced non-JSON-safe output.', {
+      details: { issuePaths: [path] },
+    });
+  }
+  if (typeof value !== 'object') {
+    throw new ApplicationError('INTERNAL', 'Tool produced non-JSON-safe output.', {
+      details: { issuePaths: [path] },
+    });
+  }
+  if (seen.has(value)) {
+    throw new ApplicationError('INTERNAL', 'Tool produced cyclic output.', {
+      details: { issuePaths: [path] },
+    });
+  }
+  seen.add(value);
+  let normalized: unknown;
+  if (Array.isArray(value)) {
+    normalized = value.map((item, index) => normalizeJsonSafe(item, `${path}[${index}]`, seen));
+  } else {
+    const output: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      if (item === undefined) continue;
+      output[key] = normalizeJsonSafe(item, `${path}.${key}`, seen);
+    }
+    normalized = output;
+  }
+  seen.delete(value);
+  return normalized;
+}
+
 function telemetrySummary(result: CallToolResult): ToolTelemetrySummary {
   const structured = result.structuredContent as {
     status?: ToolResultStatus;
@@ -253,9 +288,11 @@ export function registerContractTool<
               context: outcome.context ?? {},
               warnings: outcome.warnings ?? [],
             };
+            const validatedContent = outputSchema.parse(structuredContent);
+            const jsonSafeContent = normalizeJsonSafe(validatedContent) as typeof validatedContent;
             return {
               content: ensureTextContent(outcome.summary, outcome.content),
-              structuredContent,
+              structuredContent: jsonSafeContent,
               _meta: { 'io.romaco/trace': trace },
             };
           } catch (error) {

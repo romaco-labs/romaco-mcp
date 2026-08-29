@@ -25,7 +25,7 @@ describe('MCP contract helper', () => {
         title: 'Contract Test',
         description: 'Exercise strict dual MCP output.',
         inputSchema: z.object({ symbol: z.string().min(1) }),
-        dataSchema: z.object({ echoedSymbol: z.string(), artifactId: z.string() }),
+        dataSchema: z.object({ echoedSymbol: z.string(), artifactId: z.string(), score: z.number().optional() }),
         annotations: {
           readOnlyHint: true,
           destructiveHint: false,
@@ -45,6 +45,12 @@ describe('MCP contract helper', () => {
           throw new ApplicationError('DATASET_NOT_FOUND', 'Dataset missing.', {
             recovery: { action: 'load_dataset', instruction: 'Load candles first.' },
           });
+        }
+        if (symbol === 'INFINITY') {
+          return {
+            data: { echoedSymbol: symbol, artifactId: 'artifact_1', score: Infinity },
+            summary: 'Invalid output',
+          };
         }
         return {
           data: { echoedSymbol: symbol, artifactId: 'artifact_1' },
@@ -136,6 +142,19 @@ describe('MCP contract helper', () => {
       warnings: [],
     });
     expect(events.at(-1)).toMatchObject({ outcome: 'error', errorCode: 'DATASET_NOT_FOUND' });
+  });
+
+  it('fails closed when a handler returns a value JSON would silently coerce', async () => {
+    const result = await client.callTool({
+      name: 'romaco_contract_test',
+      arguments: { symbol: 'INFINITY' },
+    });
+    expect(result.isError).toBe(true);
+    expect(result.structuredContent).toMatchObject({
+      status: 'error',
+      error: { code: 'INTERNAL' },
+    });
+    expect(JSON.stringify(result)).not.toContain('"artifactId":null');
   });
 
   it('rejects undeclared input properties before the handler', async () => {
