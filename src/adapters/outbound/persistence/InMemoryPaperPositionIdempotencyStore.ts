@@ -6,7 +6,7 @@ import type { PaperPositionReceipt } from '../../../domain/paper/model.js';
 
 type Record =
   | { fingerprint: string; state: 'pending' }
-  | { fingerprint: string; state: 'retryable' }
+  | { fingerprint: string; state: 'indeterminate' }
   | { fingerprint: string; state: 'complete'; receipt: PaperPositionReceipt };
 
 /** Process-local paper execution journal. Never routes or persists real orders. */
@@ -18,17 +18,13 @@ export class InMemoryPaperPositionIdempotencyStore implements PaperPositionIdemp
     if (!record) return { kind: 'missing' };
     if (record.fingerprint !== fingerprint) return { kind: 'conflict' };
     if (record.state === 'pending') return { kind: 'pending' };
-    if (record.state === 'retryable') return { kind: 'missing' };
+    if (record.state === 'indeterminate') return { kind: 'indeterminate' };
     return { kind: 'replay', receipt: record.receipt };
   }
 
   reserve(idempotencyKey: string, fingerprint: string): boolean {
     const existing = this.records.get(idempotencyKey);
-    if (existing) {
-      if (existing.state !== 'retryable' || existing.fingerprint !== fingerprint) return false;
-      this.records.set(idempotencyKey, { fingerprint, state: 'pending' });
-      return true;
-    }
+    if (existing) return false;
     this.records.set(idempotencyKey, { fingerprint, state: 'pending' });
     return true;
   }
@@ -41,12 +37,12 @@ export class InMemoryPaperPositionIdempotencyStore implements PaperPositionIdemp
     this.records.set(idempotencyKey, { fingerprint, state: 'complete', receipt });
   }
 
-  release(idempotencyKey: string, fingerprint: string): void {
+  markIndeterminate(idempotencyKey: string, fingerprint: string): void {
     const record = this.records.get(idempotencyKey);
     if (record?.state === 'pending' && record.fingerprint === fingerprint) {
-      // Retain payload binding after ambiguous/failed execution. Exact payload
-      // may retry; changed payload remains a deterministic conflict.
-      this.records.set(idempotencyKey, { fingerprint, state: 'retryable' });
+      // Transport rejection cannot prove whether host mutated before response
+      // loss. Never auto-retry this key: manual reconciliation is required.
+      this.records.set(idempotencyKey, { fingerprint, state: 'indeterminate' });
     }
   }
 }

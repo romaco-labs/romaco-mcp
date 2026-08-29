@@ -208,5 +208,32 @@ describe('approval-gated chart mutation contracts', () => {
       await close();
     }
   });
-});
 
+  it('blocks automatic paper retry after ambiguous host failure', async () => {
+    vi.mocked(bridge.executeAction).mockRejectedValueOnce(new Error('response lost'));
+    const { client, close } = await clientFixture();
+    const input = { side: 'long', quantity: 1, idempotencyKey: 'paper-indeterminate-1' };
+    try {
+      const challenge = await client.callTool({ name: 'romaco_open_paper_position', arguments: input });
+      const approvalToken = structured(challenge).error.recovery.parameters.approvalToken;
+      const failed = await client.callTool({
+        name: 'romaco_open_paper_position',
+        arguments: { ...input, approvalToken },
+      });
+      expect(structured(failed)).toMatchObject({
+        status: 'error',
+        error: { code: 'ACTION_DENIED', retryable: false, recovery: { action: 'change_input' } },
+      });
+
+      const retry = await client.callTool({ name: 'romaco_open_paper_position', arguments: input });
+      expect(structured(retry)).toMatchObject({
+        status: 'error',
+        error: { code: 'ACTION_DENIED', retryable: false },
+      });
+      expect(structured(retry).error.message).toMatch(/indeterminate/i);
+      expect(bridge.executeAction).toHaveBeenCalledTimes(1);
+    } finally {
+      await close();
+    }
+  });
+});

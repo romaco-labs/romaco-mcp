@@ -99,6 +99,16 @@ export class OpenPaperPositionUseCase {
         details: { idempotencyKey },
       });
     }
+    if (lookup.kind === 'indeterminate') {
+      throw new ApplicationError('ACTION_DENIED', 'Paper-position outcome is indeterminate for this idempotencyKey.', {
+        recovery: {
+          action: 'change_input',
+          instruction:
+            'Inspect chart paper positions and reconcile outcome manually. Only then use a new idempotencyKey and obtain fresh approval if another simulation is needed.',
+        },
+        details: { idempotencyKey },
+      });
+    }
     if (lookup.kind === 'replay') return { kind: 'replay', receipt: lookup.receipt };
 
     const intent: PaperPositionIntent = {
@@ -123,6 +133,15 @@ export class OpenPaperPositionUseCase {
     if (lookup.kind === 'conflict') {
       throw new ApplicationError('IDEMPOTENCY_CONFLICT', 'idempotencyKey payload changed before execution.', {
         recovery: { action: 'change_input', instruction: 'Use a new idempotencyKey for a changed payload.' },
+        details: { idempotencyKey: preparation.idempotencyKey },
+      });
+    }
+    if (lookup.kind === 'indeterminate') {
+      throw new ApplicationError('ACTION_DENIED', 'Paper-position outcome became indeterminate before execution.', {
+        recovery: {
+          action: 'change_input',
+          instruction: 'Inspect chart paper positions, reconcile outcome, then use a new key with fresh approval.',
+        },
         details: { idempotencyKey: preparation.idempotencyKey },
       });
     }
@@ -167,12 +186,13 @@ export class OpenPaperPositionUseCase {
       this.idempotency.complete(preparation.idempotencyKey, preparation.fingerprint, receipt);
       return { receipt, replayed: false };
     } catch (cause) {
-      this.idempotency.release(preparation.idempotencyKey, preparation.fingerprint);
+      this.idempotency.markIndeterminate(preparation.idempotencyKey, preparation.fingerprint);
       throw new ApplicationError('ACTION_DENIED', 'Chart rejected approved paper position.', {
-        retryable: true,
+        retryable: false,
         recovery: {
-          action: 'retry',
-          instruction: 'Verify paired chart identity and paper-trading host policy, then request new approval.',
+          action: 'change_input',
+          instruction:
+            'Outcome may be ambiguous. Inspect chart paper positions and reconcile manually before using a new key with fresh approval.',
         },
         details: { idempotencyKey: preparation.idempotencyKey },
         cause,

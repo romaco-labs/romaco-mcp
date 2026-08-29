@@ -136,8 +136,9 @@ MCP approval never overrides host denial.
 
 Completed paper same-key/same-payload retries return stored receipt without new
 chart action. Same key with changed payload returns `IDEMPOTENCY_CONFLICT`.
-Idempotency journal is process-local, not durable: restart, crash, or ambiguous
-bridge timeout cannot promise exactly-once execution.
+Ambiguous bridge failure marks key indeterminate and denies automatic retry;
+inspect chart state, reconcile outcome, then use new key with fresh approval.
+Journal is process-local, not durable: restart/crash cannot promise exactly-once.
 
 ## Configuration
 

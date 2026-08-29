@@ -213,9 +213,10 @@ is replaced with empty desired state, leaving user and unrelated groups intact.
 Paper positions are visual simulation only: no broker, real order, or money.
 Caller supplies stable `idempotencyKey`. Same completed key/payload returns same
 stored receipt without another chart write; changed payload gets
-`IDEMPOTENCY_CONFLICT`. Journal is memory-only for MCP process. Restart, crash,
-or ambiguous bridge timeout does not provide durable exactly-once execution;
-use chart host audit/idempotency if stronger guarantees become available.
+`IDEMPOTENCY_CONFLICT`. Ambiguous bridge failure marks key indeterminate and
+blocks automatic retry until user inspects chart state, reconciles outcome, and
+uses a new key with fresh approval. Journal is memory-only for MCP process;
+restart/crash does not provide durable exactly-once execution.
 
 ---
 

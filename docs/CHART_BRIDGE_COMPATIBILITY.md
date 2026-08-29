@@ -74,8 +74,10 @@ write policy.
 MCP binds caller `idempotencyKey` to exact chart identity and payload. Completed
 same-key/same-payload retry returns stored receipt; changed payload fails closed.
 Store is process-local and memory-only. It prevents duplicate successful calls
-while process survives, but cannot guarantee crash-safe exactly-once semantics
-or resolve response-loss ambiguity. No claim of durable trade execution exists.
+while process survives. Ambiguous failure makes key terminally indeterminate;
+MCP denies automatic retry until manual chart reconciliation and fresh-key
+approval. It cannot guarantee crash-safe exactly-once semantics. No claim of
+durable trade execution exists.
 
 ## Compatibility behavior
 

@@ -88,7 +88,7 @@ describe('OpenPaperPositionUseCase', () => {
     expect(context.chart.execute).toHaveBeenCalledTimes(1);
   });
 
-  it('releases reservation after host rejection so a fresh approval may retry', async () => {
+  it('makes host-rejected outcome terminal until manual reconciliation', async () => {
     const context = fixture();
     vi.mocked(context.chart.execute).mockRejectedValueOnce(new Error('denied'));
     const input = { side: 'long' as const, quantity: 1, idempotencyKey: 'paper-retry' };
@@ -96,7 +96,11 @@ describe('OpenPaperPositionUseCase', () => {
     if (first.kind !== 'ready') throw new Error('fixture unexpectedly replayed');
     await expect(context.useCase.execute(first)).rejects.toMatchObject({ code: 'ACTION_DENIED' });
 
-    await expect(context.useCase.prepare(input)).resolves.toMatchObject({ kind: 'ready' });
+    await expect(context.useCase.prepare(input)).rejects.toMatchObject({
+      code: 'ACTION_DENIED',
+      retryable: false,
+      message: expect.stringMatching(/indeterminate/i),
+    });
     await expect(context.useCase.prepare({
       ...input,
       quantity: 2,
