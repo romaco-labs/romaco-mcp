@@ -48,6 +48,28 @@ export function registerClearDrawings(
     async ({ planId, approvalToken }) => {
       try {
         const plan = await useCase.preview();
+        if (approvalToken && !planId) {
+          throw new ApplicationError('APPROVAL_INVALID', 'planId is required with approvalToken.', {
+            recovery: {
+              action: 'request_approval',
+              instruction: 'Request a fresh preview and retry with both returned fields.',
+            },
+          });
+        }
+        // A consumed token must not become an apparent successful no-op after
+        // its approved groups were removed. Reject replay before empty-plan exit.
+        if (approvalToken && planId && plan.groups.length === 0) {
+          approvals.consume(
+            { action: 'romaco_clear_drawings', resourceId: planId },
+            approvalToken,
+          );
+          throw new ApplicationError('APPROVAL_INVALID', 'Drawing-clear approval token is invalid or already consumed.', {
+            recovery: {
+              action: 'request_approval',
+              instruction: 'Request a fresh preview before any later drawing-clear operation.',
+            },
+          });
+        }
         if (plan.groups.length === 0) {
           return {
             status: 'noop',

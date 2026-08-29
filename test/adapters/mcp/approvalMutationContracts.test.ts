@@ -89,6 +89,16 @@ describe('approval-gated chart mutation contracts', () => {
       expect(chartState.snapshot().drawingGroups).toHaveLength(0);
       expect(chartState.snapshot().drawings).toHaveLength(1);
       expect(chartState.snapshot().drawings[0].action).toMatchObject({ groupId: 'user/group' });
+
+      const replay = await client.callTool({
+        name: 'romaco_clear_drawings',
+        arguments: { planId: parameters.planId, approvalToken: parameters.approvalToken },
+      });
+      expect(structured(replay)).toMatchObject({
+        status: 'error',
+        error: { code: 'APPROVAL_INVALID' },
+      });
+      expect(bridge.executeAction).toHaveBeenCalledTimes(1);
     } finally {
       await close();
     }
