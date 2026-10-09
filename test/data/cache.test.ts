@@ -45,62 +45,63 @@ describe('cache', () => {
 
   it('returns candles after writeCache (cache hit)', async () => {
     const { writeCache, readCache } = await import('../../src/data/cache.js');
-    await writeCache(aaplReq, sampleCandles);
+    await writeCache(aaplReq, { candles: sampleCandles, fetchedAt: Date.now() });
     const got = await readCache(aaplReq);
-    expect(got).toEqual(sampleCandles);
+    expect(got?.candles).toEqual(sampleCandles);
+    expect(got?.fetchedAt).toBeTypeOf('number');
   });
 
   it('distinct symbols use distinct keys (no collision)', async () => {
     const { writeCache, readCache } = await import('../../src/data/cache.js');
     const nvdaReq: LoadRequest = { ...aaplReq, symbol: 'NVDA' };
-    await writeCache(aaplReq, sampleCandles);
-    await writeCache(nvdaReq, [{ ...sampleCandles[0], open: 999 }]);
+    await writeCache(aaplReq, { candles: sampleCandles, fetchedAt: Date.now() });
+    await writeCache(nvdaReq, { candles: [{ ...sampleCandles[0], open: 999 }], fetchedAt: Date.now() });
     const aapl = await readCache(aaplReq);
     const nvda = await readCache(nvdaReq);
-    expect(aapl?.[0].open).toBe(100);
-    expect(nvda?.[0].open).toBe(999);
+    expect(aapl?.candles[0].open).toBe(100);
+    expect(nvda?.candles[0].open).toBe(999);
   });
 
   it('distinct timeframes use distinct keys', async () => {
     const { writeCache, readCache } = await import('../../src/data/cache.js');
     const hReq: LoadRequest = { ...aaplReq, timeframe: '1h' };
-    await writeCache(aaplReq, sampleCandles);
-    await writeCache(hReq, [{ ...sampleCandles[0], open: 888 }]);
+    await writeCache(aaplReq, { candles: sampleCandles, fetchedAt: Date.now() });
+    await writeCache(hReq, { candles: [{ ...sampleCandles[0], open: 888 }], fetchedAt: Date.now() });
     const d = await readCache(aaplReq);
     const h = await readCache(hReq);
-    expect(d?.[0].open).toBe(100);
-    expect(h?.[0].open).toBe(888);
+    expect(d?.candles[0].open).toBe(100);
+    expect(h?.candles[0].open).toBe(888);
   });
 
-  it('TTL expired entries return null', async () => {
+  it('TTL follows acquisition time even when file mtime is fresh', async () => {
     const { writeCache, readCache } = await import('../../src/data/cache.js');
-    // 1m timeframe → TTL 60s. Set mtime far in the past to simulate expiry.
     const oneMinReq: LoadRequest = { ...aaplReq, timeframe: '1m' };
-    await writeCache(oneMinReq, sampleCandles);
+    await writeCache(oneMinReq, { candles: sampleCandles, fetchedAt: Date.now() - 2 * 60 * 60_000 });
 
-    // Force file mtime to 2 hours ago.
-    const file = path.join(
-      process.env.ROMACO_CACHE_DIR!,
-      // Re-derive filename by writing again — the actual filename is opaque (SHA1),
-      // so list the dir and pick the only file.
-    );
     const dir = process.env.ROMACO_CACHE_DIR!;
     const entries = await fs.readdir(dir);
-    expect(entries.length).toBeGreaterThan(0);
-    const past = (Date.now() - 2 * 60 * 60_000) / 1000;
+    expect(entries).toHaveLength(1);
     for (const e of entries) {
-      await fs.utimes(path.join(dir, e), past, past);
+      const now = new Date();
+      await fs.utimes(path.join(dir, e), now, now);
     }
 
     const got = await readCache(oneMinReq);
     expect(got).toBeNull();
-    // Avoid unused warning
-    expect(file).toBeTypeOf('string');
+  });
+
+  it('refetches legacy array-only entries with unknown acquisition time', async () => {
+    const { writeCache, readCache } = await import('../../src/data/cache.js');
+    await writeCache(aaplReq, { candles: sampleCandles, fetchedAt: Date.now() });
+    const dir = process.env.ROMACO_CACHE_DIR!;
+    const [name] = await fs.readdir(dir);
+    await fs.writeFile(path.join(dir, name), JSON.stringify(sampleCandles));
+    expect(await readCache(aaplReq)).toBeNull();
   });
 
   it('purgeCache wipes everything', async () => {
     const { writeCache, readCache, purgeCache } = await import('../../src/data/cache.js');
-    await writeCache(aaplReq, sampleCandles);
+    await writeCache(aaplReq, { candles: sampleCandles, fetchedAt: Date.now() });
     expect(await readCache(aaplReq)).not.toBeNull();
     await purgeCache();
     expect(await readCache(aaplReq)).toBeNull();

@@ -11,6 +11,8 @@ export class LegacySessionProjection implements ActiveDatasetProjection {
       timeframe: dataset.timeframe,
       candles: [...dataset.candles],
       fetched_at: dataset.fetchedAt,
+      ...(dataset.servedAt === undefined ? {} : { served_at: dataset.servedAt }),
+      ...(dataset.cacheHit === undefined ? {} : { cache_hit: dataset.cacheHit }),
     });
   }
 }

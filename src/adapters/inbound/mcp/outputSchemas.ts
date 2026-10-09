@@ -142,6 +142,8 @@ export const datasetDescriptorSchema = z.object({
   lastTimestamp: z.number().nullable(),
   lastClose: z.number().nullable(),
   fetchedAt: z.number(),
+  servedAt: z.number().nullable(),
+  cacheHit: z.boolean().nullable(),
 }).strict();
 
 export const positionSizeDataSchema = z.object({
@@ -397,6 +399,8 @@ export function describeDataset(dataset: {
   source: 'yfinance' | 'raw';
   candles: ReadonlyArray<{ timestamp: number; close: number }>;
   fetchedAt: number;
+  servedAt?: number;
+  cacheHit?: boolean;
 }) {
   const first = dataset.candles[0];
   const last = dataset.candles[dataset.candles.length - 1];
@@ -410,5 +414,7 @@ export function describeDataset(dataset: {
     lastTimestamp: last?.timestamp ?? null,
     lastClose: last?.close ?? null,
     fetchedAt: dataset.fetchedAt,
+    servedAt: dataset.servedAt ?? null,
+    cacheHit: dataset.cacheHit ?? null,
   };
 }

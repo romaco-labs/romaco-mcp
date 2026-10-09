@@ -84,6 +84,8 @@ See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a c
 
 Every successful `yfinance` fetch is cached to `~/.romaco/cache/` with per-timeframe TTL (1m→1min, 1h→1h, 1d→24h, …). A grid of N widgets requesting the same symbol triggers **one** upstream fetch. Wipe the cache anytime with `rm -rf ~/.romaco/cache`, or override the location with `ROMACO_CACHE_DIR=/tmp/cache`.
 
+Dataset output separates `fetchedAt` (upstream fetch completion) from `servedAt` (this request) and `cacheHit`. TTL uses the original `fetchedAt`; old cache files without acquisition time are refetched. For `raw` input, `fetchedAt` means when MCP accepted the supplied candles, not when the external market published them. Legacy session snapshots may report `servedAt`/`cacheHit` as `null`.
+
 ## What it does
 
 Exposes 20+ MCP tools in two categories:

@@ -17,6 +17,9 @@ export interface DatasetDraft {
   timeframe: Timeframe;
   candles: readonly Candle[];
   fetchedAt: number;
+  /** Absent on legacy/imported datasets with unknown request provenance. */
+  servedAt?: number;
+  cacheHit?: boolean;
 }
 
 export interface DatasetRecord extends DatasetDraft {
