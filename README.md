@@ -94,7 +94,8 @@ Exposes 20+ MCP tools in two categories:
 - `romaco_setup_chart` — one-command setup: load + preset + analyze (recommended first call)
 - `romaco_load_candles` — fetch OHLCV from Yahoo Finance (free) or pass your own array
 - `romaco_analyze_market` — full technical analysis: trend, S/R levels, RSI/MACD/divergences, volatility, patterns
-- `romaco_thesis` — computed bull/bear debate → verdict (long/short/stand_aside) + confidence + entry/stop/target setup; stands aside when R/R is poor (won't fake a signal)
+- `romaco_thesis` — computed bull/bear debate → verdict (long/short/stand_aside) + uncalibrated evidence score + entry/stop/target setup; stands aside when R/R fails its geometry threshold
+- `romaco_thesis_batch` — multi-symbol heuristic ranking; `score = R/R × confidence` for valid setups (otherwise zero), neither win probability nor expected return
 - `romaco_find_levels` — support/resistance via K-means + Volume Profile (POC/VAH/VAL)
 - `romaco_detect_patterns` — H&S, double top/bottom, triangles, flags
 - `romaco_calculate_position_size` — pure-math risk-based position sizing with R/R + breakeven win-rate

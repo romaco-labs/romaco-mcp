@@ -69,6 +69,10 @@ describe('romaco_thesis tool', () => {
       expect(t.analysisId).toMatch(/^analysis_/);
       expect(t.datasetId).toMatch(/^dataset_/);
       expect(t.provider).toBe('local');
+      expect(t.confidenceSemantics).toMatchObject({
+        kind: 'heuristic_evidence_score',
+        isProbability: false,
+      });
       expect(['long', 'short', 'stand_aside']).toContain(t.verdict);
     } finally {
       await close();

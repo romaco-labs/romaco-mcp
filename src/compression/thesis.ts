@@ -34,7 +34,7 @@ export interface TradeSetup {
 export interface TradeThesis {
   bias: 'bullish' | 'bearish' | 'neutral';
   verdict: 'long' | 'short' | 'stand_aside';
-  confidence: number; // 0..1
+  confidence: number; // 0..1 heuristic evidence score; not win probability
   bull: ThesisPoint[];
   bear: ThesisPoint[];
   setup: TradeSetup | null;
@@ -58,7 +58,7 @@ const W = {
 
 const BIAS_THRESHOLD = 0.15; // |net| below this → neutral / stand_aside
 const CONF_FULL_MASS = 0.6; // total evidence weight that maps to "full" confidence
-const MIN_RR = 1.0; // below this, the setup is not worth taking → stand_aside
+const MIN_RR = 1.0; // below this geometry threshold, stand_aside
 const NEAR_LEVEL_PCT = 0.015; // within 1.5% counts as "at" a level
 const DEFAULT_ATR_STOP_MULT = 1.5; // stop fallback when no structural level
 // A structural (k-means) stop farther than this from entry is "absurdly far" and
@@ -354,7 +354,7 @@ export function composeThesis(summary: MarketSummary): TradeThesis {
   if (verdict !== 'stand_aside') {
     setup = buildSetup(verdict, summary, topPattern);
     if (!setup) {
-      // No clean, positive-expectancy setup → stand aside. Never always-signal.
+      // No clean setup at the required R/R threshold; expectancy is unknown.
       notes.push('no clean setup at acceptable R/R — standing aside');
       verdict = 'stand_aside';
       confidence = round(confidence * 0.5, 2);

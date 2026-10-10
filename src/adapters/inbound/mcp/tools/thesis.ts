@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApplicationError } from '../../../../application/errors.js';
 import type { ResolveThesisArtifactUseCase } from '../../../../application/use-cases/resolveThesisArtifact.js';
 import type { AnalysisRecord } from '../../../../domain/analysis/model.js';
+import { confidenceSemanticsFor } from '../../../../domain/analysis/semantics.js';
 import { registerCatalogContractTool } from '../catalogContractTool.js';
 import type { RegisterContractToolOptions, ToolWarning } from '../contracts.js';
 import { thesisDataSchema } from '../outputSchemas.js';
@@ -16,6 +17,7 @@ function serializeArtifact(artifact: AnalysisRecord, warning?: string): string {
     analysisId: artifact.analysisId,
     datasetId: artifact.datasetId,
     provider: artifact.provider,
+    confidenceSemantics: confidenceSemanticsFor(artifact.provider),
     ...(warning ? { warning } : {}),
   }) + DISCLAIMER;
 }
@@ -32,7 +34,9 @@ export function registerThesis(
       description:
         'Produce an actionable trade thesis for the currently loaded candles: a computed bull/bear debate ' +
         '(every point derived from real features, not guessed), a verdict (long / short / stand_aside) with ' +
-        'confidence, and a concrete setup (entry, stop, target, reward/risk) plus invalidation. ' +
+        'local confidence as a heuristic evidence score; stored provider scores remain unverified. ' +
+        'Neither score is a calibrated win probability. Returns a concrete setup ' +
+        '(entry, stop, target, reward/risk) plus invalidation. ' +
         'Stands aside when there is no clean setup at acceptable R/R — it will not manufacture a signal. ' +
         'Call romaco_load_candles or romaco_setup_chart first. Returns <2 KB. ' +
         'Local analysis returns a stable analysisId used by romaco_annotate. ' +
@@ -64,6 +68,7 @@ export function registerThesis(
             datasetId: artifact.datasetId,
             provider: artifact.provider,
             thesis: artifact.thesis,
+            confidenceSemantics: confidenceSemanticsFor(artifact.provider),
             disclaimer: DISCLAIMER_TEXT,
           },
           summary: serializeArtifact(artifact, warning),

@@ -114,6 +114,12 @@ describe('hex-migrated MCP output contracts', () => {
         datasetId: expect.stringMatching(/^dataset_/),
         provider: 'local',
         thesis: { verdict: expect.any(String) },
+        confidenceSemantics: {
+          kind: 'heuristic_evidence_score',
+          method: 'evidence_agreement_mass_v1',
+          calibrated: false,
+          isProbability: false,
+        },
       },
       context: {
         datasetId: expect.stringMatching(/^dataset_/),

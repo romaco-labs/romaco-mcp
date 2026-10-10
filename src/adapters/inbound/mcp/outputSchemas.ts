@@ -1,5 +1,10 @@
 import { z } from 'zod';
 import { PATTERN_KINDS } from '../../../compression/types.js';
+import {
+  BATCH_SCORE_SEMANTICS,
+  LOCAL_CONFIDENCE_SEMANTICS,
+  UNVERIFIED_PROVIDER_CONFIDENCE_SEMANTICS,
+} from '../../../domain/analysis/semantics.js';
 
 export const TIMEFRAMES = [
   '1m', '2m', '5m', '15m', '30m',
@@ -33,6 +38,31 @@ export const tradeThesisSchema = z.object({
   invalidation: z.object({ price: z.number(), reason: z.string() }).strict().nullable(),
   horizon: z.enum(['intraday', 'swing', 'position']),
   notes: z.array(z.string()),
+}).strict();
+
+export const confidenceSemanticsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal(LOCAL_CONFIDENCE_SEMANTICS.kind),
+    method: z.literal(LOCAL_CONFIDENCE_SEMANTICS.method),
+    version: z.literal(LOCAL_CONFIDENCE_SEMANTICS.version),
+    calibrated: z.literal(false),
+    isProbability: z.literal(false),
+  }).strict(),
+  z.object({
+    kind: z.literal(UNVERIFIED_PROVIDER_CONFIDENCE_SEMANTICS.kind),
+    method: z.literal(UNVERIFIED_PROVIDER_CONFIDENCE_SEMANTICS.method),
+    version: z.null(),
+    calibrated: z.literal(false),
+    isProbability: z.literal(false),
+  }).strict(),
+]);
+
+export const batchScoreSemanticsSchema = z.object({
+  kind: z.literal(BATCH_SCORE_SEMANTICS.kind),
+  method: z.literal(BATCH_SCORE_SEMANTICS.method),
+  version: z.literal(BATCH_SCORE_SEMANTICS.version),
+  isProbability: z.literal(false),
+  isExpectedReturn: z.literal(false),
 }).strict();
 
 export const patternPointSchema = z.object({
@@ -196,6 +226,7 @@ export const thesisDataSchema = z.object({
   datasetId: z.string().min(1),
   provider: z.enum(['local', 'gateway']),
   thesis: tradeThesisSchema,
+  confidenceSemantics: confidenceSemanticsSchema,
   disclaimer: z.string(),
 }).strict();
 
@@ -206,6 +237,7 @@ export const batchThesisItemSchema = z.object({
   analysisId: z.string().min(1),
   verdict: z.enum(['long', 'short', 'stand_aside']),
   confidence: z.number().min(0).max(1),
+  confidenceSemantics: confidenceSemanticsSchema,
   score: z.number().finite(),
   setup: tradeSetupSchema.nullable(),
 }).strict();
@@ -213,6 +245,7 @@ export const batchThesisItemSchema = z.object({
 export const thesisBatchDataSchema = z.object({
   items: z.array(batchThesisItemSchema),
   top: batchThesisItemSchema,
+  scoreSemantics: batchScoreSemanticsSchema,
   failures: z.array(z.object({
     symbol: z.string().min(1),
     code: z.literal('DATA_SOURCE_UNAVAILABLE'),

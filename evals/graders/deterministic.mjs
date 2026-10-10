@@ -362,7 +362,15 @@ function financialGrader(task, trial) {
       : fail('position-size invariant failed');
   }
   if (task.id === 'H09_batch_partial_failure') {
-    const items = structured(trial.facts.batch).data.items;
+    const batch = structured(trial.facts.batch).data;
+    const items = batch.items;
+    if (
+      batch.scoreSemantics?.kind !== 'heuristic_rank'
+      || batch.scoreSemantics?.isExpectedReturn !== false
+      || items.some((item) => item.confidenceSemantics?.isProbability !== false)
+    ) {
+      return fail('batch ranking lacks honest heuristic and probability semantics');
+    }
     const ordered = items.every((item, index) => index === 0 || items[index - 1].score >= item.score);
     const valid = items.every((item) => {
       if (!item.setup) return item.score === 0;
