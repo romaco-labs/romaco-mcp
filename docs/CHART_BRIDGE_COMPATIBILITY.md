@@ -4,6 +4,11 @@ Headless analysis does not require `romaco-charts`. Live reads and ordinary
 chart actions require `<McpBridge />`. Atomic thesis and pattern annotations
 require a chart host that implements `replaceAgentDrawingGroup`.
 
+Chart writes need `romaco-charts` 1.0.3 or later. That release reports
+`resolution` in the chart context and implements `replaceAgentDrawingGroup`.
+With 1.0.2 and older, live reads work but every write fails closed with
+`CHART_NOT_READY` or `ACTION_DENIED` and a message asking to upgrade.
+
 Approval tokens are MCP-side capabilities. They never bypass host
 `actionPolicy`; host authorization remains an independent second barrier.
 

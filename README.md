@@ -342,7 +342,7 @@ before it can become callable. No automatic network fallback exists today.
 ## Requirements
 
 - Node.js >= 20
-- For chart-bridge tools: romaco-charts >= 1.0.0-beta.6 with `<McpBridge />` in your app
+- For chart-bridge tools: romaco-charts >= 1.0.3 with `<McpBridge />` in your app. Older versions do not report the chart timeframe, so MCP refuses every chart write against them.
 
 ---
 

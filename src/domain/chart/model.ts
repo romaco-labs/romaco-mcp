@@ -125,3 +125,16 @@ export function parseChartTimeframe(value: unknown): Timeframe | undefined {
     ? value as Timeframe
     : undefined;
 }
+
+/** Shown when a connected chart reports a symbol but no timeframe. */
+export const MISSING_TIMEFRAME_HINT =
+  'The chart did not report its timeframe; romaco-charts 1.0.2 and older do not. ' +
+  'Upgrade romaco-charts to 1.0.3 or later.';
+
+/** Appends the upgrade hint when only the timeframe is missing. */
+export function withIdentityHint(
+  message: string,
+  identity: { symbol?: string | null; timeframe?: string | null },
+): string {
+  return identity.symbol && !identity.timeframe ? `${message} ${MISSING_TIMEFRAME_HINT}` : message;
+}

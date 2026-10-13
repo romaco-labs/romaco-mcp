@@ -8,6 +8,7 @@ import type {
   ReplaceDrawingGroupCommand,
 } from '../../../domain/chart/model.js';
 import { mapChartContext, mapChartIdentity } from './mapChartContext.js';
+import { withIdentityHint } from '../../../domain/chart/model.js';
 
 export interface BridgeTransport {
   readonly isConnected: boolean;
@@ -84,7 +85,7 @@ function assertIdentity(expected: ChartIdentity | undefined, actual: ChartIdenti
 
 function toBridgeExpectedIdentity(identity: ChartIdentity) {
   if (!identity.symbol || !identity.timeframe) {
-    throw new Error('Expected chart identity requires chartId, symbol, and timeframe.');
+    throw new Error(withIdentityHint('Expected chart identity requires chartId, symbol, and timeframe.', identity));
   }
   return {
     chartId: identity.chartId,

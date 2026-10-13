@@ -2,6 +2,7 @@ import { ApplicationError } from '../errors.js';
 import type { ChartPort } from '../ports/chart.js';
 import type { ChartDesiredStatePort } from '../ports/chartDesiredState.js';
 import type { ChartIdentity } from '../../domain/chart/model.js';
+import { withIdentityHint } from '../../domain/chart/model.js';
 
 export interface ClearableAlert {
   alertId: string;
@@ -27,7 +28,7 @@ function exactIdentity(identity: ChartIdentity): ClearAlertsPlan['identity'] {
   if (!identity.symbol || !identity.timeframe) {
     throw new ApplicationError(
       'CHART_NOT_READY',
-      'Clearing alerts requires exact chartId, symbol, and timeframe identity.',
+      withIdentityHint('Clearing alerts requires exact chartId, symbol, and timeframe identity.', identity),
       {
         retryable: true,
         recovery: {

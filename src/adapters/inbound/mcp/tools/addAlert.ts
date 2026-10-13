@@ -6,6 +6,7 @@ import type { ChartDesiredStatePort } from '../../../../application/ports/chartD
 import { registerCatalogContractTool } from '../catalogContractTool.js';
 import type { RegisterContractToolOptions } from '../contracts.js';
 import { addAlertDataSchema } from '../outputSchemas.js';
+import { withIdentityHint } from '../../../../domain/chart/model.js';
 
 function mapChartError(error: unknown): ApplicationError {
   if (error instanceof ApplicationError) return error;
@@ -42,7 +43,7 @@ export function registerAddAlert(
       try {
         const identity = await chart.getIdentity();
         if (!identity.symbol || !identity.timeframe) {
-          throw new ApplicationError('CHART_NOT_READY', 'Alert requires exact chart symbol and timeframe.', {
+          throw new ApplicationError('CHART_NOT_READY', withIdentityHint('Alert requires exact chart symbol and timeframe.', identity), {
             retryable: true,
             recovery: { action: 'connect_chart', instruction: 'Load chart symbol/timeframe and retry.' },
           });
