@@ -6,6 +6,7 @@ interface PackageManifest {
   version: string;
   mcpName?: string;
   repository?: { url?: string };
+  bin?: Record<string, string>;
 }
 
 interface RegistryManifest {
@@ -49,5 +50,12 @@ describe('release metadata', () => {
     expect(registry.description.length).toBeLessThanOrEqual(100);
     expect(registry.repository?.source).toBe('github');
     expect(registry.repository?.url).toBe(pkg.repository?.url);
+  });
+
+  it('declares the CLI bin in the form npm publish keeps', () => {
+    // npm 11 drops "./"-prefixed bin paths from the published manifest, which
+    // would ship a package without the romaco-mcp command.
+    const pkg = readJson<PackageManifest>('package.json');
+    expect(pkg.bin).toEqual({ 'romaco-mcp': 'dist/index.js' });
   });
 });
