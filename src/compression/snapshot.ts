@@ -142,8 +142,13 @@ export interface CompressedVisibleCandles {
   first_candle: VisibleCandleLike | null;
   last_candle: VisibleCandleLike | null;
   ohlc_range: { minLow: number; maxHigh: number; openFirst: number; closeLast: number } | null;
-  volume: { sum: number; avg: number; max: number } | null;
-  returns: { pctChange: number; atrApprox: number } | null;
+  /**
+   * Null when no visible candle reports a positive volume. `avg` is over
+   * `bars_with_volume`, not over all candles.
+   */
+  volume: { sum: number; avg: number; max: number; bars_with_volume: number } | null;
+  /** `pctChange` is null without a positive first open; `atrApprox` is null with one candle. */
+  returns: { pctChange: number | null; atrApprox: number | null } | null;
 }
 
 export function compressVisibleCandles(candles: VisibleCandleLike[]): CompressedVisibleCandles {
@@ -164,6 +169,7 @@ export function compressVisibleCandles(candles: VisibleCandleLike[]): Compressed
   let maxHigh = Number.NEGATIVE_INFINITY;
   let volSum = 0;
   let volMax = 0;
+  let volBars = 0;
   let trSum = 0; // true-range approximation
   let prevClose: number | null = null;
   for (const c of arr) {
@@ -171,9 +177,12 @@ export function compressVisibleCandles(candles: VisibleCandleLike[]): Compressed
     const high = typeof c.high === 'number' ? c.high : Number.NEGATIVE_INFINITY;
     if (low < minLow) minLow = low;
     if (high > maxHigh) maxHigh = high;
-    const vol = typeof c.volume === 'number' ? c.volume : 0;
-    volSum += vol;
-    if (vol > volMax) volMax = vol;
+    // Missing and zero volume both mean "no volume reported" here.
+    if (typeof c.volume === 'number' && Number.isFinite(c.volume) && c.volume > 0) {
+      volSum += c.volume;
+      volBars += 1;
+      if (c.volume > volMax) volMax = c.volume;
+    }
     if (prevClose != null && typeof c.high === 'number' && typeof c.low === 'number') {
       const tr = Math.max(
         c.high - c.low,
@@ -190,7 +199,7 @@ export function compressVisibleCandles(candles: VisibleCandleLike[]): Compressed
   const closeLast = last.close ?? 0;
   const firstTs = first.timestamp ?? first.time ?? null;
   const lastTs = last.timestamp ?? last.time ?? null;
-  const atrApprox = arr.length > 1 ? trSum / (arr.length - 1) : 0;
+  const atrApprox = arr.length > 1 ? trSum / (arr.length - 1) : null;
   return {
     count: arr.length,
     first_ts: firstTs,
@@ -198,9 +207,9 @@ export function compressVisibleCandles(candles: VisibleCandleLike[]): Compressed
     first_candle: first,
     last_candle: last,
     ohlc_range: { minLow, maxHigh, openFirst, closeLast },
-    volume: { sum: volSum, avg: volSum / arr.length, max: volMax },
+    volume: volBars > 0 ? { sum: volSum, avg: volSum / volBars, max: volMax, bars_with_volume: volBars } : null,
     returns: {
-      pctChange: openFirst > 0 ? ((closeLast - openFirst) / openFirst) * 100 : 0,
+      pctChange: openFirst > 0 ? ((closeLast - openFirst) / openFirst) * 100 : null,
       atrApprox,
     },
   };

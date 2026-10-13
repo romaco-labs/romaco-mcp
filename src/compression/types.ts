@@ -43,18 +43,24 @@ export interface LevelDetail {
 export interface LevelsSummary {
   support: number[];     // sorted ascending, max 3
   resistance: number[];  // sorted ascending, max 3
-  poc: number;           // point of control (highest-volume price level)
-  vah: number;           // value area high (70% volume upper bound)
-  val: number;           // value area low (70% volume lower bound)
+  poc: number | null;    // point of control (highest-volume price level)
+  vah: number | null;    // value area high (70% volume upper bound)
+  val: number | null;    // value area low (70% volume lower bound)
+  /**
+   * `insufficient` when volume is missing or zero on more than half the
+   * candles (FX and some indices on Yahoo, raw input without volume); POC,
+   * VAH and VAL are then null instead of derived from an empty histogram.
+   */
+  volume_status: 'ok' | 'insufficient';
   /** Present only when findLevels ran with { withDetail: true }. */
   detail?: { support: LevelDetail[]; resistance: LevelDetail[] };
 }
 
 export interface MomentumSummary {
-  rsi: number;                                  // current RSI(14)
-  rsi_state: 'overbought' | 'oversold' | 'neutral';
-  macd_cross: 'bullish' | 'bearish' | 'none';   // recent (last 3 bars)
-  macd_histogram: number;
+  rsi: number | null;                           // current RSI(14); null before MIN_RSI_CANDLES
+  rsi_state: 'overbought' | 'oversold' | 'neutral' | 'insufficient_data';
+  macd_cross: 'bullish' | 'bearish' | 'none' | 'insufficient_data';   // recent (last 3 bars)
+  macd_histogram: number | null;                // null before MIN_MACD_CANDLES
   divergences: DivergenceSummary;
 }
 
@@ -85,11 +91,11 @@ export interface Divergence {
 }
 
 export interface VolatilitySummary {
-  atr: number;
-  atr_pct: number;          // ATR as % of current price
-  bb_squeeze: boolean;       // Bollinger Bands width vs Keltner
-  bb_width_pct: number;      // band width as % of price
-  state: 'expanding' | 'contracting' | 'stable';
+  atr: number | null;              // null before MIN_ATR_CANDLES
+  atr_pct: number | null;          // ATR as % of current price
+  bb_squeeze: boolean | null;      // Bollinger Bands width vs Keltner; null before MIN_BOLLINGER_CANDLES
+  bb_width_pct: number | null;     // band width as % of price
+  state: 'expanding' | 'contracting' | 'stable' | 'insufficient_data';
 }
 
 /** Single source of truth for pattern kinds — PatternHit.kind derives from it,

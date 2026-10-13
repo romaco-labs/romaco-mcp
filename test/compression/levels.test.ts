@@ -7,7 +7,8 @@ describe('findLevels', () => {
     const l = findLevels([]);
     expect(l.support).toEqual([]);
     expect(l.resistance).toEqual([]);
-    expect(l.poc).toBe(0);
+    expect(l.poc).toBeNull();
+    expect(l.volume_status).toBe('insufficient');
   });
 
   it('support levels are below current price', () => {

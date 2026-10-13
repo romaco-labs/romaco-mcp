@@ -82,8 +82,10 @@ export class AnnotateThesisUseCase {
     const drawings: AddDrawing[] = [];
     for (const support of levels.support) drawings.push(line(support, `S ${fmt(support)}`, anchorTs, STYLE_LEVEL));
     for (const resistance of levels.resistance) drawings.push(line(resistance, `R ${fmt(resistance)}`, anchorTs, STYLE_LEVEL));
-    if (Number.isFinite(levels.poc) && levels.poc > 0) {
-      drawings.push(line(levels.poc, `POC ${fmt(levels.poc)}`, anchorTs, STYLE_POC));
+    // No POC line without volume: the level would be invented.
+    const poc = levels.poc;
+    if (poc !== null && Number.isFinite(poc) && poc > 0) {
+      drawings.push(line(poc, `POC ${fmt(poc)}`, anchorTs, STYLE_POC));
     }
     const pattern = topRecentPattern(summary);
     if (pattern?.invalidation_price !== undefined && Number.isFinite(pattern.invalidation_price)) {
@@ -93,7 +95,7 @@ export class AnnotateThesisUseCase {
     const setup = thesis.setup;
     if (thesis.verdict !== 'stand_aside' && setup) {
       const atr = summary.volatility.atr;
-      if (atr > 0) {
+      if (atr !== null && atr > 0) {
         const band = ZONE_ATR_FRAC * atr;
         const far = thesis.verdict === 'long' ? setup.entry - band : setup.entry + band;
         drawings.push({

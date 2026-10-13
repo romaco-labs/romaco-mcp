@@ -120,7 +120,7 @@ export function registerAnnotate(server: McpServer): void {
     const context: AddDrawing[] = [];
     for (const s of L.support) context.push(line(s, `S ${fmt(s)}`, anchorTs, STYLE_LEVEL));
     for (const r of L.resistance) context.push(line(r, `R ${fmt(r)}`, anchorTs, STYLE_LEVEL));
-    if (Number.isFinite(L.poc) && L.poc > 0) context.push(line(L.poc, `POC ${fmt(L.poc)}`, anchorTs, STYLE_POC));
+    if (L.poc !== null && Number.isFinite(L.poc) && L.poc > 0) context.push(line(L.poc, `POC ${fmt(L.poc)}`, anchorTs, STYLE_POC));
     const pat = topRecentPattern(summary);
     if (pat && Number.isFinite(pat.invalidation_price)) {
       context.push(line(pat.invalidation_price as number, `${pat.kind} invalidation`, anchorTs, STYLE_PATTERN));
@@ -137,7 +137,7 @@ export function registerAnnotate(server: McpServer): void {
     const setup = thesis.setup;
     if (thesis.verdict !== 'stand_aside' && setup != null) {
       const atr = summary.volatility.atr;
-      if (atr > 0) {
+      if (atr !== null && atr > 0) {
         const band = ZONE_ATR_FRAC * atr;
         const far = thesis.verdict === 'long' ? setup.entry - band : setup.entry + band;
         const zone: AddDrawing = {

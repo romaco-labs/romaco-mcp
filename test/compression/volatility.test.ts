@@ -63,7 +63,8 @@ describe('volatilitySummary', () => {
 
   it('handles empty', () => {
     const s = volatilitySummary([]);
-    expect(s.atr).toBe(0);
-    expect(s.state).toBe('stable');
+    expect(s.atr).toBeNull();
+    expect(s.atr_pct).toBeNull();
+    expect(s.state).toBe('insufficient_data');
   });
 });

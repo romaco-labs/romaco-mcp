@@ -1,5 +1,6 @@
 import type { Candle, MomentumSummary, Divergence } from './types.js';
 import { findPivotsInSeries } from './pivots.js';
+import { MIN_MACD_CANDLES, MIN_RSI_CANDLES } from './minimums.js';
 
 /**
  * RSI (Relative Strength Index) using Wilder's smoothing.
@@ -211,11 +212,15 @@ export function momentumSummary(candles: Candle[]): MomentumSummary {
   const rsiSeries = rsi(candles);
   const macdData = macd(candles);
 
-  const lastRsi = rsiSeries[rsiSeries.length - 1] ?? 50;
+  const rawRsi = rsiSeries[rsiSeries.length - 1];
+  const lastRsi = candles.length >= MIN_RSI_CANDLES && Number.isFinite(rawRsi) ? rawRsi : null;
   let rsiState: MomentumSummary['rsi_state'];
-  if (lastRsi >= 70) rsiState = 'overbought';
+  if (lastRsi === null) rsiState = 'insufficient_data';
+  else if (lastRsi >= 70) rsiState = 'overbought';
   else if (lastRsi <= 30) rsiState = 'oversold';
   else rsiState = 'neutral';
+  const macdReady = candles.length >= MIN_MACD_CANDLES;
+  const rawHistogram = macdData.histogram[macdData.histogram.length - 1];
 
   const allDivs = [
     ...detectDivergences(candles, 'rsi'),
@@ -237,10 +242,10 @@ export function momentumSummary(candles: Candle[]): MomentumSummary {
     .slice(0, 3);
 
   return {
-    rsi: Number.isFinite(lastRsi) ? lastRsi : 50,
+    rsi: lastRsi,
     rsi_state: rsiState,
-    macd_cross: detectMacdCross(candles),
-    macd_histogram: macdData.histogram[macdData.histogram.length - 1] ?? 0,
+    macd_cross: macdReady ? detectMacdCross(candles) : 'insufficient_data',
+    macd_histogram: macdReady && Number.isFinite(rawHistogram) ? rawHistogram : null,
     divergences: {
       count: allDivs.length,
       by_kind: byKind,
