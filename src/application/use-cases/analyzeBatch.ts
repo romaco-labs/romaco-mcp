@@ -53,6 +53,8 @@ export class AnalyzeBatchUseCase {
         items.push({
           dataset,
           artifact,
+          // Ranking heuristic only: confidence is uncalibrated evidence agreement,
+          // so this product is neither win probability nor expected return.
           score: setup ? setup.rr * artifact.thesis.confidence : 0,
         });
       } catch (error) {

@@ -5,6 +5,11 @@ import path from 'node:path';
 import type { Candle } from '../compression/types.js';
 import type { LoadRequest } from './types.js';
 
+export interface CachedCandles {
+  candles: Candle[];
+  fetchedAt: number;
+}
+
 /**
  * Disk cache for fetched candles. Keyed by SHA1 of (source:symbol:timeframe:lookback)
  * with per-timeframe TTL (volatile bars expire quickly, daily/weekly hold longer).
@@ -46,21 +51,27 @@ function fileFor(req: LoadRequest): string {
   return path.join(cacheDir(), `${cacheKey(req)}.json`);
 }
 
-export async function readCache(req: LoadRequest): Promise<Candle[] | null> {
+export async function readCache(req: LoadRequest): Promise<CachedCandles | null> {
   const file = fileFor(req);
   try {
-    const stat = await fs.stat(file);
-    if (Date.now() - stat.mtimeMs > ttlFor(req.timeframe)) return null;
     const raw = await fs.readFile(file, 'utf-8');
-    return JSON.parse(raw) as Candle[];
+    const parsed: unknown = JSON.parse(raw);
+    // Legacy array-only entries have no trustworthy acquisition time. Refetch.
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+    const entry = parsed as Record<string, unknown>;
+    if (entry.version !== 1 || !Array.isArray(entry.candles)) return null;
+    if (typeof entry.fetchedAt !== 'number' || !Number.isFinite(entry.fetchedAt)) return null;
+    const age = Date.now() - entry.fetchedAt;
+    if (entry.fetchedAt <= 0 || age < 0 || age > ttlFor(req.timeframe)) return null;
+    return { candles: entry.candles as Candle[], fetchedAt: entry.fetchedAt };
   } catch {
     return null;
   }
 }
 
-export async function writeCache(req: LoadRequest, candles: Candle[]): Promise<void> {
+export async function writeCache(req: LoadRequest, entry: CachedCandles): Promise<void> {
   await fs.mkdir(cacheDir(), { recursive: true });
-  await fs.writeFile(fileFor(req), JSON.stringify(candles));
+  await fs.writeFile(fileFor(req), JSON.stringify({ version: 1, ...entry }));
 }
 
 /** Test/CLI helper. Wipes the entire cache dir; safe if it doesn't exist. */

@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://www.romaco.io",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@romaco/mcp",
-      "version": "0.0.4",
+      "version": "0.0.5",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

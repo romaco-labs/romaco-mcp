@@ -25,7 +25,12 @@ export interface LoadResponse {
   symbol: string;
   timeframe: Timeframe;
   candles: Candle[];
+  /** When upstream fetch completed (or raw data was accepted), not when cached data was served. */
   fetched_at: number;
+  /** When this load request completed. Absent on legacy session snapshots. */
+  served_at?: number;
+  /** Whether this request used a disk cache entry. Absent on legacy snapshots. */
+  cache_hit?: boolean;
 }
 
 export interface DataSource {

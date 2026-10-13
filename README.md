@@ -84,6 +84,18 @@ See [examples/pro-volatility-scanner](./examples/pro-volatility-scanner) for a c
 
 Every successful `yfinance` fetch is cached to `~/.romaco/cache/` with per-timeframe TTL (1m→1min, 1h→1h, 1d→24h, …). A grid of N widgets requesting the same symbol triggers **one** upstream fetch. Wipe the cache anytime with `rm -rf ~/.romaco/cache`, or override the location with `ROMACO_CACHE_DIR=/tmp/cache`.
 
+Dataset output separates `fetchedAt` (upstream fetch completion) from `servedAt` (this request) and `cacheHit`. TTL uses the original `fetchedAt`; old cache files without acquisition time are refetched. For `raw` input, `fetchedAt` means when MCP accepted the supplied candles, not when the external market published them. Legacy session snapshots may report `servedAt`/`cacheHit` as `null`.
+
+Each dataset also carries `provenance` (version 1):
+
+- `datasetHash`: `sha256:` of the source, symbol, timeframe and OHLCV values. Identical data gives the same hash.
+- `asOf`: the information cut-off (`fetchedAt`); nothing after it is in the dataset.
+- `lastBar`: the last bar's open time (`observedAt`), the latest time it can close (`availableAt`, bar open plus one interval), and `complete: false` when that time is after `asOf`, meaning the bar may still be forming.
+- `coverage`: bar count, first and last bar open times, and bars with zero volume (Yahoo reports missing volume as zero).
+- `priceAdjustment` is `splits` for `yfinance` (Yahoo chart prices are split-adjusted, not dividend-adjusted) and `unknown` for `raw`. `vintage` is `null`: neither source publishes data vintages, so later revisions cannot be identified.
+
+`romaco_thesis`, `romaco_thesis_batch` and `romaco_detect_patterns` return `dataProvenance` (`datasetHash`, `asOf`) for the exact dataset each result was computed from. All `*At` provenance times are milliseconds since epoch, UTC.
+
 ## What it does
 
 Exposes 20+ MCP tools in two categories:
@@ -92,7 +104,8 @@ Exposes 20+ MCP tools in two categories:
 - `romaco_setup_chart` — one-command setup: load + preset + analyze (recommended first call)
 - `romaco_load_candles` — fetch OHLCV from Yahoo Finance (free) or pass your own array
 - `romaco_analyze_market` — full technical analysis: trend, S/R levels, RSI/MACD/divergences, volatility, patterns
-- `romaco_thesis` — computed bull/bear debate → verdict (long/short/stand_aside) + confidence + entry/stop/target setup; stands aside when R/R is poor (won't fake a signal)
+- `romaco_thesis` — computed bull/bear debate → verdict (long/short/stand_aside) + uncalibrated evidence score + entry/stop/target setup; stands aside when R/R fails its geometry threshold
+- `romaco_thesis_batch` — multi-symbol heuristic ranking; `score = R/R × confidence` for valid setups (otherwise zero), neither win probability nor expected return
 - `romaco_find_levels` — support/resistance via K-means + Volume Profile (POC/VAH/VAL)
 - `romaco_detect_patterns` — H&S, double top/bottom, triangles, flags
 - `romaco_calculate_position_size` — pure-math risk-based position sizing with R/R + breakeven win-rate
@@ -329,7 +342,7 @@ before it can become callable. No automatic network fallback exists today.
 ## Requirements
 
 - Node.js >= 20
-- For chart-bridge tools: romaco-charts >= 1.0.0-beta.6 with `<McpBridge />` in your app
+- For chart-bridge tools: romaco-charts >= 1.0.3 with `<McpBridge />` in your app. Older versions do not report the chart timeframe, so MCP refuses every chart write against them.
 
 ---
 

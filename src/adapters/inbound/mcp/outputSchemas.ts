@@ -1,5 +1,11 @@
 import { z } from 'zod';
+import type { DatasetProvenance } from '../../../domain/dataset/provenance.js';
 import { PATTERN_KINDS } from '../../../compression/types.js';
+import {
+  BATCH_SCORE_SEMANTICS,
+  LOCAL_CONFIDENCE_SEMANTICS,
+  UNVERIFIED_PROVIDER_CONFIDENCE_SEMANTICS,
+} from '../../../domain/analysis/semantics.js';
 
 export const TIMEFRAMES = [
   '1m', '2m', '5m', '15m', '30m',
@@ -13,6 +19,34 @@ const thesisPointSchema = z.object({
   factor: z.string(),
   weight: z.number(),
   detail: z.string(),
+}).strict();
+
+export const datasetProvenanceSchema = z.object({
+  version: z.literal(1),
+  datasetHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  asOf: z.number(),
+  timezone: z.literal('UTC'),
+  timestampUnit: z.literal('unix_seconds'),
+  priceAdjustment: z.enum(['splits', 'unknown']),
+  vintage: z.null(),
+  availableAtBasis: z.literal('bar_open_plus_interval'),
+  lastBar: z.object({
+    observedAt: z.number(),
+    availableAt: z.number(),
+    complete: z.boolean(),
+  }).strict().nullable(),
+  coverage: z.object({
+    barCount: z.number().int().nonnegative(),
+    firstObservedAt: z.number().nullable(),
+    lastObservedAt: z.number().nullable(),
+    zeroVolumeBars: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+
+/** Correlates an analysis with the exact data it was computed from. */
+export const dataProvenanceRefSchema = z.object({
+  datasetHash: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  asOf: z.number(),
 }).strict();
 
 export const tradeSetupSchema = z.object({
@@ -33,6 +67,31 @@ export const tradeThesisSchema = z.object({
   invalidation: z.object({ price: z.number(), reason: z.string() }).strict().nullable(),
   horizon: z.enum(['intraday', 'swing', 'position']),
   notes: z.array(z.string()),
+}).strict();
+
+export const confidenceSemanticsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal(LOCAL_CONFIDENCE_SEMANTICS.kind),
+    method: z.literal(LOCAL_CONFIDENCE_SEMANTICS.method),
+    version: z.literal(LOCAL_CONFIDENCE_SEMANTICS.version),
+    calibrated: z.literal(false),
+    isProbability: z.literal(false),
+  }).strict(),
+  z.object({
+    kind: z.literal(UNVERIFIED_PROVIDER_CONFIDENCE_SEMANTICS.kind),
+    method: z.literal(UNVERIFIED_PROVIDER_CONFIDENCE_SEMANTICS.method),
+    version: z.null(),
+    calibrated: z.literal(false),
+    isProbability: z.literal(false),
+  }).strict(),
+]);
+
+export const batchScoreSemanticsSchema = z.object({
+  kind: z.literal(BATCH_SCORE_SEMANTICS.kind),
+  method: z.literal(BATCH_SCORE_SEMANTICS.method),
+  version: z.literal(BATCH_SCORE_SEMANTICS.version),
+  isProbability: z.literal(false),
+  isExpectedReturn: z.literal(false),
 }).strict();
 
 export const patternPointSchema = z.object({
@@ -60,6 +119,7 @@ export const trimmedPatternSchema = z.object({
 export const detectPatternsDataSchema = z.object({
   analysisId: z.string().min(1),
   datasetId: z.string().min(1),
+  dataProvenance: dataProvenanceRefSchema.nullable(),
   format: z.enum(['concise', 'full']),
   count: z.number().int().nonnegative(),
   patterns: z.array(z.union([trimmedPatternSchema, patternSchema])),
@@ -142,6 +202,10 @@ export const datasetDescriptorSchema = z.object({
   lastTimestamp: z.number().nullable(),
   lastClose: z.number().nullable(),
   fetchedAt: z.number(),
+  servedAt: z.number().nullable(),
+  cacheHit: z.boolean().nullable(),
+  /** Null only for legacy records created before provenance v1. */
+  provenance: datasetProvenanceSchema.nullable(),
 }).strict();
 
 export const positionSizeDataSchema = z.object({
@@ -192,8 +256,10 @@ export const setupChartDataSchema = z.object({
 export const thesisDataSchema = z.object({
   analysisId: z.string().min(1),
   datasetId: z.string().min(1),
+  dataProvenance: dataProvenanceRefSchema.nullable(),
   provider: z.enum(['local', 'gateway']),
   thesis: tradeThesisSchema,
+  confidenceSemantics: confidenceSemanticsSchema,
   disclaimer: z.string(),
 }).strict();
 
@@ -202,8 +268,10 @@ export const batchThesisItemSchema = z.object({
   timeframe: timeframeSchema,
   datasetId: z.string().min(1),
   analysisId: z.string().min(1),
+  dataProvenance: dataProvenanceRefSchema.nullable(),
   verdict: z.enum(['long', 'short', 'stand_aside']),
   confidence: z.number().min(0).max(1),
+  confidenceSemantics: confidenceSemanticsSchema,
   score: z.number().finite(),
   setup: tradeSetupSchema.nullable(),
 }).strict();
@@ -211,6 +279,7 @@ export const batchThesisItemSchema = z.object({
 export const thesisBatchDataSchema = z.object({
   items: z.array(batchThesisItemSchema),
   top: batchThesisItemSchema,
+  scoreSemantics: batchScoreSemanticsSchema,
   failures: z.array(z.object({
     symbol: z.string().min(1),
     code: z.literal('DATA_SOURCE_UNAVAILABLE'),
@@ -397,6 +466,9 @@ export function describeDataset(dataset: {
   source: 'yfinance' | 'raw';
   candles: ReadonlyArray<{ timestamp: number; close: number }>;
   fetchedAt: number;
+  servedAt?: number;
+  cacheHit?: boolean;
+  provenance?: DatasetProvenance;
 }) {
   const first = dataset.candles[0];
   const last = dataset.candles[dataset.candles.length - 1];
@@ -410,5 +482,8 @@ export function describeDataset(dataset: {
     lastTimestamp: last?.timestamp ?? null,
     lastClose: last?.close ?? null,
     fetchedAt: dataset.fetchedAt,
+    servedAt: dataset.servedAt ?? null,
+    cacheHit: dataset.cacheHit ?? null,
+    provenance: dataset.provenance ?? null,
   };
 }

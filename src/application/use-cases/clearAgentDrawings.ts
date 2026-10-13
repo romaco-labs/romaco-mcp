@@ -2,6 +2,7 @@ import { ApplicationError } from '../errors.js';
 import type { AgentDrawingGroupSummary, AgentDrawingJournalPort } from '../ports/agentDrawingJournal.js';
 import type { ChartPort } from '../ports/chart.js';
 import type { ChartIdentity } from '../../domain/chart/model.js';
+import { withIdentityHint } from '../../domain/chart/model.js';
 
 const AGENT_GROUP_PREFIX = 'romaco-mcp/';
 
@@ -21,7 +22,7 @@ function exactIdentity(identity: ChartIdentity): ClearAgentDrawingsPlan['identit
   if (!identity.symbol || !identity.timeframe) {
     throw new ApplicationError(
       'CHART_NOT_READY',
-      'Clearing agent drawings requires exact chartId, symbol, and timeframe identity.',
+      withIdentityHint('Clearing agent drawings requires exact chartId, symbol, and timeframe identity.', identity),
       {
         retryable: true,
         recovery: {

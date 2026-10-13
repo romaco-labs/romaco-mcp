@@ -340,8 +340,8 @@ export const ROMACO_TOOL_CATALOG = [
     risk: { level: 'high', financial: true, approval: 'none' },
     output: {
       schemaId: 'romaco.thesis.v1',
-      summary: 'Grounded thesis, provenance, setup, and educational disclaimer.',
-      dataFields: ['analysisId', 'datasetId', 'engine', 'thesis', 'disclaimer'],
+      summary: 'Grounded thesis with uncalibrated evidence score, setup, and disclaimer.',
+      dataFields: ['analysisId', 'datasetId', 'provider', 'thesis', 'confidenceSemantics', 'disclaimer'],
       identityFields: ['datasetId', 'analysisId', 'symbol', 'timeframe'],
       contentKinds: TEXT,
       supportsPartial: true,
@@ -355,8 +355,8 @@ export const ROMACO_TOOL_CATALOG = [
     risk: { level: 'high', financial: true, approval: 'none' },
     output: {
       schemaId: 'romaco.thesis-batch.v1',
-      summary: 'Ranked thesis items, top selection, and per-symbol failures.',
-      dataFields: ['items', 'top', 'failures', 'sessionDatasetId', 'disclaimer'],
+      summary: 'Heuristic ranking, score semantics, top selection, and per-symbol failures.',
+      dataFields: ['items', 'top', 'scoreSemantics', 'failures', 'sessionDatasetId', 'disclaimer'],
       identityFields: ['datasetId', 'analysisId', 'symbol', 'timeframe'],
       contentKinds: TEXT,
       supportsPartial: true,

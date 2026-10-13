@@ -37,6 +37,7 @@ export function registerDetectPatterns(
           data: {
             analysisId: artifact.analysisId,
             datasetId: artifact.datasetId,
+            dataProvenance: artifact.dataProvenance ?? null,
             format,
             count: full.length,
             patterns,

@@ -1,6 +1,6 @@
 {
   "name": "@romaco/mcp",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "mcpName": "io.github.romaco-labs/romaco-mcp",
   "description": "MCP server for romaco-charts — control your trading chart from Claude, Cursor, or any MCP-compatible AI agent",
   "type": "module",
@@ -41,7 +41,7 @@
     "vitest": "^4.1.6"
   },
   "peerDependencies": {
-    "romaco-charts": ">=1.0.0-beta.6"
+    "romaco-charts": ">=1.0.3"
   },
   "peerDependenciesMeta": {
     "romaco-charts": {

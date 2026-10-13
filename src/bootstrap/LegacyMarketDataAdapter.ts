@@ -18,6 +18,8 @@ export class LegacyMarketDataAdapter implements MarketDataPort {
       timeframe: loaded.timeframe,
       candles: loaded.candles,
       fetchedAt: loaded.fetched_at,
+      servedAt: loaded.served_at,
+      cacheHit: loaded.cache_hit,
     };
   }
 }

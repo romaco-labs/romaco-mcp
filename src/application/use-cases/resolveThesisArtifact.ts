@@ -80,6 +80,10 @@ export class ResolveThesisArtifactUseCase {
       thesis,
       schemaVersion: 'thesis-v1',
       createdAt: this.now(),
+      dataProvenance: {
+        datasetHash: dataset.provenance.datasetHash,
+        asOf: dataset.provenance.asOf,
+      },
     });
     if (activate) await this.activation.activateAnalysisIfCurrent(dataset, artifact);
     return artifact;

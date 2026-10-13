@@ -32,6 +32,8 @@ describe('loadCandles — original routing', () => {
     const after = Date.now();
     expect(r.fetched_at).toBeGreaterThanOrEqual(before);
     expect(r.fetched_at).toBeLessThanOrEqual(after);
+    expect(r.served_at).toBeGreaterThanOrEqual(r.fetched_at);
+    expect(r.cache_hit).toBe(false);
   });
 
   it('throws on unknown source', async () => {
@@ -117,12 +119,16 @@ describe('loadCandles — in-flight dedup + cache', () => {
     const { loadCandles } = await import('../../src/data/loader.js');
     fetchSpy.mockResolvedValue(sampleCandles);
 
-    await loadCandles(aaplReq);
+    const first = await loadCandles(aaplReq);
     // Wait for best-effort writeCache to finish.
     await new Promise((r) => setImmediate(r));
-    await loadCandles(aaplReq);
+    const second = await loadCandles(aaplReq);
 
     expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(first.cache_hit).toBe(false);
+    expect(second.cache_hit).toBe(true);
+    expect(second.fetched_at).toBe(first.fetched_at);
+    expect(second.served_at).toBeGreaterThanOrEqual(first.served_at);
   });
 
   it('source error rejects waiters and clears inflight (next call re-fetches)', async () => {

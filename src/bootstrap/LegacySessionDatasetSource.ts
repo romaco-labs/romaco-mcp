@@ -12,6 +12,8 @@ export class LegacySessionDatasetSource implements ActiveDatasetSource {
       timeframe: load.timeframe,
       candles: [...load.candles],
       fetchedAt: load.fetched_at,
+      ...(load.served_at === undefined ? {} : { servedAt: load.served_at }),
+      ...(load.cache_hit === undefined ? {} : { cacheHit: load.cache_hit }),
     };
   }
 }

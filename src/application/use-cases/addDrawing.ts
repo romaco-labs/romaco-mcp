@@ -3,6 +3,7 @@ import type { ChartPort } from '../ports/chart.js';
 import type { ChartDrawingJournalPort } from '../ports/chartDrawingJournal.js';
 import type { DrawingTemplateCatalogPort } from '../ports/drawingTemplateCatalog.js';
 import type { ChartCommand, ChartIdentity } from '../../domain/chart/model.js';
+import { withIdentityHint } from '../../domain/chart/model.js';
 
 type AddDrawingCommand = Extract<ChartCommand, { action: 'addDrawing' }>;
 const AGENT_GROUP_PREFIX = 'romaco-mcp/';
@@ -104,7 +105,7 @@ export class AddDrawingUseCase {
 
     const identity = await this.chart.getIdentity();
     if (!identity.symbol || !identity.timeframe) {
-      throw new ApplicationError('CHART_NOT_READY', 'Live chart identity requires chartId, symbol, and timeframe.', {
+      throw new ApplicationError('CHART_NOT_READY', withIdentityHint('Live chart identity requires chartId, symbol, and timeframe.', identity), {
         retryable: true,
         recovery: { action: 'connect_chart', instruction: 'Load a symbol and timeframe in McpBridge, then retry.' },
       });

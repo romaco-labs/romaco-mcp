@@ -8,6 +8,7 @@ import {
   type PaperPositionReceipt,
 } from '../../domain/paper/model.js';
 import type { ChartIdentity } from '../../domain/chart/model.js';
+import { withIdentityHint } from '../../domain/chart/model.js';
 
 export interface OpenPaperPositionInput extends PaperPositionIntent {
   idempotencyKey: string;
@@ -71,7 +72,7 @@ export class OpenPaperPositionUseCase {
     try {
       fingerprint = paperPositionFingerprint(identity, input);
     } catch (cause) {
-      throw new ApplicationError('CHART_NOT_READY', 'Paper position requires exact chart identity.', {
+      throw new ApplicationError('CHART_NOT_READY', withIdentityHint('Paper position requires exact chart identity.', identity), {
         retryable: true,
         recovery: {
           action: 'connect_chart',
