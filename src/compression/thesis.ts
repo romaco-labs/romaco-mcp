@@ -1,4 +1,5 @@
 import type { MarketSummary, PatternHit } from './types.js';
+import { MIN_THESIS_CANDLES } from './minimums.js';
 
 /**
  * Trade thesis synthesizer — the "computed bull/bear debate".
@@ -148,13 +149,16 @@ function buildSetup(
 ): TradeSetup | null {
   const { last_price } = summary.meta;
   const { support, resistance, poc, vah, val } = summary.levels;
-  const atr = summary.volatility.atr;
+  // No ATR yet (too few candles) behaves like "no ATR fallback available".
+  const atr = summary.volatility.atr ?? 0;
   const entry = last_price;
   if (!Number.isFinite(entry) || entry <= 0) return null;
 
   // Candidate structural levels, including value-area edges and POC.
-  const supports = [...support, val, poc].filter((v) => Number.isFinite(v) && v > 0);
-  const resistances = [...resistance, vah, poc].filter((v) => Number.isFinite(v) && v > 0);
+  // Value-area levels are null without volume; they are then simply not candidates.
+  const usable = (v: number | null): v is number => v !== null && Number.isFinite(v) && v > 0;
+  const supports = [...support, val, poc].filter(usable);
+  const resistances = [...resistance, vah, poc].filter(usable);
 
   if (dir === 'long') {
     let stop = nearestBelow(supports, entry);
@@ -226,8 +230,10 @@ export function composeThesis(summary: MarketSummary): TradeThesis {
   const { last_price, timeframe_seconds } = summary.meta;
   const horizon = inferHorizon(timeframe_seconds);
 
-  // Degenerate input → stand aside, no fabrication.
-  if (!summary.meta.candle_count || !Number.isFinite(last_price) || last_price <= 0) {
+  // Degenerate or too-short input → stand aside, no fabrication. Below
+  // MIN_THESIS_CANDLES the momentum and volatility readings are not warmed up.
+  const candleCount = summary.meta.candle_count;
+  if (!candleCount || candleCount < MIN_THESIS_CANDLES || !Number.isFinite(last_price) || last_price <= 0) {
     return {
       bias: 'neutral',
       verdict: 'stand_aside',
@@ -237,7 +243,11 @@ export function composeThesis(summary: MarketSummary): TradeThesis {
       setup: null,
       invalidation: null,
       horizon,
-      notes: ['insufficient data'],
+      notes: [
+        candleCount && candleCount < MIN_THESIS_CANDLES
+          ? `insufficient data: ${candleCount} candles, a thesis needs at least ${MIN_THESIS_CANDLES}`
+          : 'insufficient data',
+      ],
     };
   }
 
@@ -253,9 +263,9 @@ export function composeThesis(summary: MarketSummary): TradeThesis {
 
   // ── Momentum ──
   const m = summary.momentum;
-  if (m.rsi_state === 'oversold') {
+  if (m.rsi_state === 'oversold' && m.rsi !== null) {
     bull.push({ factor: 'rsi_oversold', weight: W.rsiExtreme, detail: `RSI ${round(m.rsi, 1)} oversold` });
-  } else if (m.rsi_state === 'overbought') {
+  } else if (m.rsi_state === 'overbought' && m.rsi !== null) {
     bear.push({ factor: 'rsi_overbought', weight: W.rsiExtreme, detail: `RSI ${round(m.rsi, 1)} overbought` });
   }
   if (m.macd_cross === 'bullish') {
@@ -277,7 +287,7 @@ export function composeThesis(summary: MarketSummary): TradeThesis {
 
   // ── Value location (POC) ──
   const { poc, support, resistance } = summary.levels;
-  if (Number.isFinite(poc) && poc > 0) {
+  if (poc !== null && Number.isFinite(poc) && poc > 0) {
     if (last_price >= poc) {
       bull.push({ factor: 'above_poc', weight: W.valueLocation, detail: `price above POC ${round(poc, 2)}` });
     } else {

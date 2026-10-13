@@ -1,6 +1,7 @@
 import type { Candle, LevelDetail, LevelsSummary } from './types.js';
 import { findCandleSwings } from './pivots.js';
 import { atr } from './volatility.js';
+import { MIN_VOLUME_COVERAGE } from './minimums.js';
 
 /**
  * 1D K-means clustering on price levels.
@@ -68,8 +69,15 @@ function findSwingExtremes(candles: Candle[], lookback = 3): { highs: number[]; 
  * Approximates volume at each bin by distributing each candle's volume
  * uniformly across its [low, high] range.
  */
-function volumeProfile(candles: Candle[], bins = 50): { poc: number; vah: number; val: number } {
-  if (candles.length === 0) return { poc: 0, vah: 0, val: 0 };
+type VolumeProfileLevels = Pick<LevelsSummary, 'poc' | 'vah' | 'val' | 'volume_status'>;
+
+const NO_VOLUME_LEVELS: VolumeProfileLevels = { poc: null, vah: null, val: null, volume_status: 'insufficient' };
+
+function volumeProfile(candles: Candle[], bins = 50): VolumeProfileLevels {
+  // An all-zero histogram would put POC at the bottom of the range; report the
+  // gap instead. Yahoo reports missing volume as 0, so zeros count as missing.
+  const withVolume = candles.filter((c) => Number.isFinite(c.volume) && c.volume > 0).length;
+  if (candles.length === 0 || withVolume < candles.length * MIN_VOLUME_COVERAGE) return NO_VOLUME_LEVELS;
 
   let minPrice = Infinity;
   let maxPrice = -Infinity;
@@ -77,7 +85,7 @@ function volumeProfile(candles: Candle[], bins = 50): { poc: number; vah: number
     if (c.low < minPrice) minPrice = c.low;
     if (c.high > maxPrice) maxPrice = c.high;
   }
-  if (minPrice === maxPrice) return { poc: minPrice, vah: minPrice, val: minPrice };
+  if (minPrice === maxPrice) return { poc: minPrice, vah: minPrice, val: minPrice, volume_status: 'ok' };
 
   const binWidth = (maxPrice - minPrice) / bins;
   const histogram = new Array<number>(bins).fill(0);
@@ -130,6 +138,7 @@ function volumeProfile(candles: Candle[], bins = 50): { poc: number; vah: number
     poc: minPrice + (pocBin + 0.5) * binWidth,
     vah: minPrice + (hi + 1) * binWidth,
     val: minPrice + lo * binWidth,
+    volume_status: 'ok',
   };
 }
 
@@ -151,7 +160,7 @@ export function findLevels(
   opts: { maxClusters?: number; withDetail?: boolean } = {},
 ): LevelsSummary {
   if (candles.length === 0) {
-    return { support: [], resistance: [], poc: 0, vah: 0, val: 0 };
+    return { support: [], resistance: [], ...NO_VOLUME_LEVELS };
   }
 
   const k = opts.maxClusters ?? 6;
@@ -166,9 +175,7 @@ export function findLevels(
   const resistance = clusters.filter(l => l > currentPrice).slice(0, 3);
   const support = clusters.filter(l => l < currentPrice).slice(-3); // closest 3 below
 
-  const { poc, vah, val } = volumeProfile(candles);
-
-  const summary: LevelsSummary = { support, resistance, poc, vah, val };
+  const summary: LevelsSummary = { support, resistance, ...volumeProfile(candles) };
   if (opts.withDetail) {
     // ATR and swings are level-independent — compute once for all 6 levels,
     // not once per level.

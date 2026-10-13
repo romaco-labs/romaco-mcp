@@ -86,8 +86,9 @@ describe('momentumSummary', () => {
 
   it('handles empty candles', () => {
     const s = momentumSummary([]);
-    expect(s.rsi).toBe(50);
-    expect(s.rsi_state).toBe('neutral');
-    expect(s.macd_cross).toBe('none');
+    expect(s.rsi).toBeNull();
+    expect(s.rsi_state).toBe('insufficient_data');
+    expect(s.macd_cross).toBe('insufficient_data');
+    expect(s.macd_histogram).toBeNull();
   });
 });

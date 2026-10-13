@@ -19,15 +19,15 @@ export function composeMarketSummary(candles: Candle[]): MarketSummary {
       meta: { candle_count: 0, first_ts: 0, last_ts: 0, last_price: 0 },
       trend: { direction: 'sideways', strength: 0, duration_candles: 0, slope_pct_per_candle: 0 },
       plr: [],
-      levels: { support: [], resistance: [], poc: 0, vah: 0, val: 0 },
+      levels: { support: [], resistance: [], poc: null, vah: null, val: null, volume_status: 'insufficient' },
       momentum: {
-        rsi: 50,
-        rsi_state: 'neutral',
-        macd_cross: 'none',
-        macd_histogram: 0,
+        rsi: null,
+        rsi_state: 'insufficient_data',
+        macd_cross: 'insufficient_data',
+        macd_histogram: null,
         divergences: { count: 0, by_kind: { bullish: 0, bearish: 0, hidden_bullish: 0, hidden_bearish: 0 }, recent: [] },
       },
-      volatility: { atr: 0, atr_pct: 0, bb_squeeze: false, bb_width_pct: 0, state: 'stable' },
+      volatility: { atr: null, atr_pct: null, bb_squeeze: null, bb_width_pct: null, state: 'insufficient_data' },
       patterns: [],
     };
   }

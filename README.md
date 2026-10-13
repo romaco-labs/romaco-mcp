@@ -96,6 +96,13 @@ Each dataset also carries `provenance` (version 1):
 
 `romaco_thesis`, `romaco_thesis_batch` and `romaco_detect_patterns` return `dataProvenance` (`datasetHash`, `asOf`) for the exact dataset each result was computed from. All `*At` provenance times are milliseconds since epoch, UTC.
 
+### Missing data is reported, not filled in
+
+- **No volume:** POC, VAH and VAL are `null` with `volume_status: "insufficient"` when fewer than half of the candles report a positive volume. Yahoo reports missing volume as 0, so FX pairs and some indices land here. Support and resistance still come from price.
+- **Too few candles:** RSI needs 15 candles, ATR 15, Bollinger Bands 20 and MACD 38. Below that, the readings are `null` and their state is `insufficient_data`, instead of RSI 50 or ATR 0.
+- **Thesis:** `romaco_thesis` stands aside below 38 candles, with a note that says why. It never uses a missing POC as a bullish or bearish factor, or as a stop or target.
+- **Visible candles:** `romaco_get_visible_candles` reports `volume: null` when no visible candle has volume. `avg` is taken over the candles that report volume (`bars_with_volume`).
+
 ## What it does
 
 Exposes 20+ MCP tools in two categories:

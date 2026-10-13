@@ -1,4 +1,5 @@
 import type { Candle, VolatilitySummary } from './types.js';
+import { MIN_ATR_CANDLES, MIN_BOLLINGER_CANDLES } from './minimums.js';
 
 /**
  * True Range for a single candle (vs previous close).
@@ -116,9 +117,13 @@ export function detectBollingerSqueeze(candles: Candle[], period = 20): boolean 
  */
 export function volatilitySummary(candles: Candle[]): VolatilitySummary {
   const atrSeries = atr(candles);
-  const lastAtr = atrSeries[atrSeries.length - 1] ?? 0;
+  const rawAtr = atrSeries[atrSeries.length - 1];
+  const lastAtr = candles.length >= MIN_ATR_CANDLES && Number.isFinite(rawAtr) ? rawAtr : null;
   const lastPrice = candles[candles.length - 1]?.close ?? 0;
-  const atrPct = lastPrice === 0 ? 0 : (lastAtr / lastPrice) * 100;
+  const atrPct = lastAtr === null || lastPrice === 0 ? null : (lastAtr / lastPrice) * 100;
+  if (candles.length < MIN_BOLLINGER_CANDLES) {
+    return { atr: lastAtr, atr_pct: atrPct, bb_squeeze: null, bb_width_pct: null, state: 'insufficient_data' };
+  }
 
   const bb = bollingerBands(candles);
   const i = candles.length - 1;
@@ -142,7 +147,7 @@ export function volatilitySummary(candles: Candle[]): VolatilitySummary {
   }
 
   return {
-    atr: Number.isFinite(lastAtr) ? lastAtr : 0,
+    atr: lastAtr,
     atr_pct: atrPct,
     bb_squeeze: squeeze,
     bb_width_pct: bbWidthPct,
