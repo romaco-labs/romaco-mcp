@@ -34,7 +34,11 @@ describe('publish workflow security contract', () => {
     expect(workflow).toMatch(/id-token:\s*write/);
     expect(workflow).toMatch(/node-version:\s*['"]24['"]/);
     expect(workflow).toContain('npm install --global npm@11.18.0');
-    expect(workflow).toContain('npm publish --access public');
+    expect(workflow).toContain('npm stage publish --access public');
+  });
+
+  it('only stages; a maintainer approves the public release on npm', () => {
+    expect(workflow).not.toMatch(/^\s*run:\s*npm publish\b/m);
   });
 
   it('contains no token fallback or manual publish trigger', () => {
@@ -44,7 +48,7 @@ describe('publish workflow security contract', () => {
 
   it('verifies release identity before the publish command', () => {
     const verifyIndex = workflow.indexOf('npm run verify:release-version');
-    const publishIndex = workflow.indexOf('npm publish --access public');
+    const publishIndex = workflow.indexOf('npm stage publish --access public');
     expect(verifyIndex).toBeGreaterThan(-1);
     expect(publishIndex).toBeGreaterThan(verifyIndex);
   });

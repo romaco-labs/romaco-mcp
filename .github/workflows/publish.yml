@@ -1,11 +1,13 @@
 name: Publish @romaco/mcp
 
-# Publishes @romaco/mcp through npm Trusted Publishing. npm must trust:
+# Stages @romaco/mcp on npm through Trusted Publishing. npm must trust:
 #   GitHub org: romaco-labs
 #   Repository: romaco-mcp
 #   Workflow: publish.yml
-#   Allowed action: npm publish
-# No long-lived write token is used or accepted by this workflow.
+#   Allowed action: npm stage publish (direct publish stays disabled)
+# No long-lived write token is used or accepted by this workflow. A
+# maintainer reviews the staged package on npm and approves it with 2FA;
+# that approval, not this workflow, makes the release public.
 
 on:
   push:
@@ -50,5 +52,13 @@ jobs:
       - name: Inspect package contents
         run: npm pack --dry-run
 
-      - name: Publish to npm through OIDC
-        run: npm publish --access public
+      - name: Stage on npm through OIDC
+        run: npm stage publish --access public
+
+      - name: Record next manual action
+        run: |
+          {
+            echo '### Package staged privately on npm'
+            echo ''
+            echo "Review the staged @romaco/mcp ${GITHUB_REF_NAME#v} on npm and approve it with 2FA to publish."
+          } >> "$GITHUB_STEP_SUMMARY"
