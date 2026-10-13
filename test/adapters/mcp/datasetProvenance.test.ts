@@ -29,6 +29,7 @@ describe('dataset provenance descriptor', () => {
     expect(datasetDescriptorSchema.parse(descriptor)).toMatchObject({
       servedAt: null,
       cacheHit: null,
+      provenance: null,
     });
   });
 });

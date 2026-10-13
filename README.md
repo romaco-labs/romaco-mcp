@@ -86,6 +86,16 @@ Every successful `yfinance` fetch is cached to `~/.romaco/cache/` with per-timef
 
 Dataset output separates `fetchedAt` (upstream fetch completion) from `servedAt` (this request) and `cacheHit`. TTL uses the original `fetchedAt`; old cache files without acquisition time are refetched. For `raw` input, `fetchedAt` means when MCP accepted the supplied candles, not when the external market published them. Legacy session snapshots may report `servedAt`/`cacheHit` as `null`.
 
+Each dataset also carries `provenance` (version 1):
+
+- `datasetHash`: `sha256:` of the source, symbol, timeframe and OHLCV values. Identical data gives the same hash.
+- `asOf`: the information cut-off (`fetchedAt`); nothing after it is in the dataset.
+- `lastBar`: the last bar's open time (`observedAt`), the latest time it can close (`availableAt`, bar open plus one interval), and `complete: false` when that time is after `asOf`, meaning the bar may still be forming.
+- `coverage`: bar count, first and last bar open times, and bars with zero volume (Yahoo reports missing volume as zero).
+- `priceAdjustment` is `splits` for `yfinance` (Yahoo chart prices are split-adjusted, not dividend-adjusted) and `unknown` for `raw`. `vintage` is `null`: neither source publishes data vintages, so later revisions cannot be identified.
+
+`romaco_thesis`, `romaco_thesis_batch` and `romaco_detect_patterns` return `dataProvenance` (`datasetHash`, `asOf`) for the exact dataset each result was computed from. All `*At` provenance times are milliseconds since epoch, UTC.
+
 ## What it does
 
 Exposes 20+ MCP tools in two categories:

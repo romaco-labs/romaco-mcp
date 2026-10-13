@@ -1,4 +1,5 @@
 import type { Candle } from '../../compression/types.js';
+import type { DatasetProvenance } from './provenance.js';
 
 declare const datasetIdBrand: unique symbol;
 
@@ -24,6 +25,7 @@ export interface DatasetDraft {
 
 export interface DatasetRecord extends DatasetDraft {
   datasetId: DatasetId;
+  provenance: DatasetProvenance;
 }
 
 export function createDatasetId(value: string): DatasetId {

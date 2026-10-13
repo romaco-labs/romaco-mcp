@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { DatasetRepository } from '../../../application/ports/datasetRepository.js';
 import {
   createDatasetId,
@@ -6,8 +6,19 @@ import {
   type DatasetId,
   type DatasetRecord,
 } from '../../../domain/dataset/model.js';
+import {
+  canonicalDatasetContent,
+  describeProvenance,
+  type DatasetProvenance,
+} from '../../../domain/dataset/provenance.js';
 
 export type RepositoryIdFactory = () => string;
+
+function freezeProvenance(provenance: DatasetProvenance): DatasetProvenance {
+  Object.freeze(provenance.coverage);
+  if (provenance.lastBar) Object.freeze(provenance.lastBar);
+  return Object.freeze(provenance);
+}
 
 export class InMemoryDatasetRepository implements DatasetRepository {
   private readonly records = new Map<DatasetId, DatasetRecord>();
@@ -17,10 +28,13 @@ export class InMemoryDatasetRepository implements DatasetRepository {
 
   async save(draft: DatasetDraft): Promise<DatasetRecord> {
     const datasetId = createDatasetId(`dataset_${this.createId()}`);
+    const candles = Object.freeze([...draft.candles]);
+    const hash = createHash('sha256').update(canonicalDatasetContent({ ...draft, candles })).digest('hex');
     const record: DatasetRecord = Object.freeze({
       ...draft,
       datasetId,
-      candles: Object.freeze([...draft.candles]),
+      candles,
+      provenance: freezeProvenance(describeProvenance({ ...draft, candles }, `sha256:${hash}`)),
     });
     this.records.set(datasetId, record);
     return record;

@@ -66,6 +66,7 @@ export function registerThesis(
           data: {
             analysisId: artifact.analysisId,
             datasetId: artifact.datasetId,
+            dataProvenance: artifact.dataProvenance ?? null,
             provider: artifact.provider,
             thesis: artifact.thesis,
             confidenceSemantics: confidenceSemanticsFor(artifact.provider),

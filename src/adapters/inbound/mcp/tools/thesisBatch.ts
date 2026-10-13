@@ -18,6 +18,7 @@ function describeItem(item: AnalyzeBatchItem) {
     timeframe: dataset.timeframe,
     datasetId: dataset.datasetId,
     analysisId: artifact.analysisId,
+    dataProvenance: artifact.dataProvenance ?? null,
     verdict: artifact.thesis.verdict,
     confidence: artifact.thesis.confidence,
     confidenceSemantics: confidenceSemanticsFor(artifact.provider),

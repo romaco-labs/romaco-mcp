@@ -15,9 +15,17 @@ export interface AnalysisPayload {
   schemaVersion: string;
 }
 
+/** Exact data an analysis was computed from; see DatasetProvenance. */
+export interface AnalysisDataProvenance {
+  datasetHash: string;
+  asOf: number;
+}
+
 export interface AnalysisDraft extends AnalysisPayload {
   datasetId: DatasetId;
   createdAt: number;
+  /** Absent only on artifacts stored before provenance v1. */
+  dataProvenance?: AnalysisDataProvenance;
 }
 
 export interface AnalysisRecord extends AnalysisDraft {
