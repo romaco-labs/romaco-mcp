@@ -9,8 +9,8 @@ const workflow = readFileSync(
 
 describe('release version gate', () => {
   it('accepts only the tag matching package.json and server.json', () => {
-    expect(verifyCurrentRelease('v0.0.4')).toBe('0.0.4');
-    expect(() => verifyCurrentRelease('v0.0.5')).toThrow(/git tag must be v0\.0\.4/);
+    expect(verifyCurrentRelease('v0.0.5')).toBe('0.0.5');
+    expect(() => verifyCurrentRelease('v0.0.6')).toThrow(/git tag must be v0\.0\.5/);
   });
 
   it('reports every metadata mismatch before publish', () => {
