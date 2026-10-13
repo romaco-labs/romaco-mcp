@@ -5,7 +5,7 @@
   "description": "MCP server for romaco-charts — control your trading chart from Claude, Cursor, or any MCP-compatible AI agent",
   "type": "module",
   "bin": {
-    "romaco-mcp": "./dist/index.js"
+    "romaco-mcp": "dist/index.js"
   },
   "exports": {
     ".": "./dist/index.js"
